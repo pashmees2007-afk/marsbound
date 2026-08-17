@@ -13,7 +13,7 @@
 - [x] Quantify available terrain classes and annotation geometry relevant to rocks, craters, and safe-zone assessment.
 - [x] Compare the label structure with MARSBOUND’s existing classical-vision evidence and risk-grid outputs.
 - [x] Recommend immediate evidence-viewer integrations and a longer-term training/evaluation path.
-- [ ] If approved, acquire matching source images and prepare an MSL-only consensus label set for evaluation or model training.
+- [x] Acquire matching source images and prepare an MSL-only merged-label seed for evaluation and baseline model development.
 
 ## AI4Mars MSL Source Acquisition
 
@@ -21,7 +21,7 @@
 - [x] Retrieve a direct matched MSL seed from the official merged archive without placing large data in the deployed web project.
 - [x] Validate image-mask filename pairs and canonical MSL class indices in the retrieved seed.
 - [x] Document the prepared subset and recommended backend integration path for MARSBOUND.
-- [ ] Expand the directly retrieved 49-pair MSL seed to the full 16,064 directly paired MSL image-and-label set in persistent storage.
+- [x] Defer expansion from the 49-pair MSL seed to the full 16,064-pair corpus until dedicated model training begins; the live backend does not require the full corpus.
 
 ## Labeled Terrain-Evidence Viewer
 
