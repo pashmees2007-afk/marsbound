@@ -74,3 +74,6 @@ The MARSBOUND mark is a **minimal descent arc crossing a centered landing reticl
 
 - Preserve visual credibility by labeling the current Curiosity result as a verified sample and raw user uploads as staged until a real backend analysis is connected.
 - Use MARSBOUND’s own wordmark, mark, and telemetry language; draw inspiration from aerospace editorial design without reproducing NASA branding or layouts.
+- The entry screen is a restrained mission briefing, not a marketing hero: reduce headline scale, remove decorative recommendation teasers, and route the visitor directly to terrain acquisition.
+- The terrain plate is the primary interface surface. Derived evidence must appear as contiguous viewing modes—raw terrain, edges, circular features, combined hazards, and risk grid—rather than as detached promotional cards.
+- Mission decision language is compact and specific. Favor tables, coordinate labels, hazard counts, and inspectable reasons over floating badges, glass effects, or ornamental UI.

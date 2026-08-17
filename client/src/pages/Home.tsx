@@ -1,43 +1,28 @@
 /**
- * MARSBOUND design: an original aerospace mission-control narrative with cinematic
- * terrain evidence, explicit analysis states, and an explainable landing recommendation.
+ * MARSBOUND evidence-first interface: terrain imagery and verified computer-vision
+ * outputs are the product. The UI uses restrained mission-software hierarchy.
  */
 import { Button } from "@/components/ui/button";
 import {
-  Activity,
   ArrowDownToLine,
-  ArrowRight,
   Check,
-  ChevronDown,
   ChevronRight,
-  ClipboardCheck,
+  CircleDotDashed,
   FileImage,
-  Grid3X3,
   Info,
   LoaderCircle,
   MapPin,
-  Play,
-  Radar,
   RefreshCw,
   ScanLine,
   ShieldCheck,
-  Sparkles,
-  TriangleAlert,
   Upload,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import type { ChangeEvent, ReactNode } from "react";
+import type { ChangeEvent } from "react";
 import { toast } from "sonner";
 
-type Mode = "original" | "hazards" | "risk" | "zones";
-type MissionStage =
-  | "briefing"
-  | "acquired"
-  | "processing"
-  | "results"
-  | "awaiting-api";
-type Classification = "Preferred" | "Conditional" | "Avoid";
-
+type Stage = "mission" | "processing" | "results" | "awaiting-api";
+type View = "raw" | "hazards" | "risk" | "zones";
 type Zone = {
   id: string;
   row: number;
@@ -45,61 +30,44 @@ type Zone = {
   risk: number;
   edgeDensity: number;
   circlePressure: number;
-  classification: Classification;
-};
-
-type AnalysisResult = {
-  filename: string;
-  dimensions: string;
-  imageState: "VERIFIED SAMPLE" | "STAGED UPLOAD";
-  circleCandidates: number;
-  edgePixels: number;
-  highRiskAreas: number;
-  safeZones: number;
-  recommendedZone: string;
-  riskScore: number;
-  confidence: "HIGH";
-  reason: string;
-  zones: Zone[];
+  classification: "PREFERRED" | "REVIEW" | "AVOID";
 };
 
 const assets = {
-  hero: "/manus-storage/marsbound-hero-terrain_f65f8de3.jpg",
-  tacticalTerrain: "/manus-storage/marsbound-tactical-terrain_22d57812.jpg",
-  galleryDune: "/manus-storage/marsbound-gallery-dune_5c983278.jpg",
-  darkGrid: "/manus-storage/marsbound-dark-grid_497d1120.jpg",
-  mark: "/manus-storage/marsbound-mark_17b62cf7.png",
-  original: "/manus-storage/curiosity_image_01_95938ea6.png",
+  raw: "/manus-storage/curiosity_image_01_95938ea6.png",
+  normalized: "/manus-storage/curiosity_image_01_normalized_1db0f368.png",
+  edges: "/manus-storage/curiosity_image_01_rock_edges_1a44c93b.png",
+  circles: "/manus-storage/curiosity_image_01_circle_candidates_59a3ddec.png",
   hazards: "/manus-storage/curiosity_image_01_annotated_71856f00.png",
-  additionalSample: "/manus-storage/curiosity_image_10_c9177f10.png",
+  mark: "/manus-storage/marsbound-mark_17b62cf7.png",
 };
 
 const zones: Zone[] = [
-  ["A1", 0, 0, 4, 0.0372, 2.0353, "Conditional"],
-  ["A2", 0, 1, 5, 0.0316, 2.6818, "Conditional"],
-  ["A3", 0, 2, 5, 0.0206, 2.7229, "Conditional"],
-  ["A4", 0, 3, 4, 0.0208, 2.1925, "Conditional"],
-  ["A5", 0, 4, 3, 0.0277, 1.4768, "Preferred"],
-  ["B1", 1, 0, 6, 0.0849, 3.0093, "Avoid"],
-  ["B2", 1, 1, 9, 0.1206, 4.5182, "Avoid"],
-  ["B3", 1, 2, 9, 0.1372, 4.644, "Avoid"],
-  ["B4", 1, 3, 8, 0.126, 3.537, "Avoid"],
-  ["B5", 1, 4, 5, 0.0797, 2.182, "Conditional"],
-  ["C1", 2, 0, 6, 0.0757, 3.0356, "Avoid"],
-  ["C2", 2, 1, 8, 0.051, 4.7446, "Avoid"],
-  ["C3", 2, 2, 8, 0.0613, 4.6897, "Avoid"],
-  ["C4", 2, 3, 7, 0.0679, 3.9577, "Avoid"],
-  ["C5", 2, 4, 5, 0.074, 2.3928, "Conditional"],
-  ["D1", 3, 0, 4, 0, 2.079, "Conditional"],
-  ["D2", 3, 1, 4, 0, 2.8096, "Conditional"],
-  ["D3", 3, 2, 5, 0.0048, 2.9307, "Conditional"],
-  ["D4", 3, 3, 4, 0.0143, 2.5191, "Conditional"],
-  ["D5", 3, 4, 3, 0.0048, 1.7252, "Preferred"],
-  ["E1", 4, 0, 3, 0, 1.2433, "Preferred"],
-  ["E2", 4, 1, 3, 0, 1.5639, "Preferred"],
-  ["E3", 4, 2, 3, 0, 1.6362, "Preferred"],
-  ["E4", 4, 3, 3, 0, 1.4378, "Preferred"],
-  ["E5", 4, 4, 2, 0.0083, 1.0664, "Preferred"],
+  ["A1", 0, 0, 4, 0.0372, 2.0353, "REVIEW"],
+  ["A2", 0, 1, 5, 0.0316, 2.6818, "REVIEW"],
+  ["A3", 0, 2, 5, 0.0206, 2.7229, "REVIEW"],
+  ["A4", 0, 3, 4, 0.0208, 2.1925, "REVIEW"],
+  ["A5", 0, 4, 3, 0.0277, 1.4768, "PREFERRED"],
+  ["B1", 1, 0, 6, 0.0849, 3.0093, "AVOID"],
+  ["B2", 1, 1, 9, 0.1206, 4.5182, "AVOID"],
+  ["B3", 1, 2, 9, 0.1372, 4.644, "AVOID"],
+  ["B4", 1, 3, 8, 0.126, 3.537, "AVOID"],
+  ["B5", 1, 4, 5, 0.0797, 2.182, "REVIEW"],
+  ["C1", 2, 0, 6, 0.0757, 3.0356, "AVOID"],
+  ["C2", 2, 1, 8, 0.051, 4.7446, "AVOID"],
+  ["C3", 2, 2, 8, 0.0613, 4.6897, "AVOID"],
+  ["C4", 2, 3, 7, 0.0679, 3.9577, "AVOID"],
+  ["C5", 2, 4, 5, 0.074, 2.3928, "REVIEW"],
+  ["D1", 3, 0, 4, 0, 2.079, "REVIEW"],
+  ["D2", 3, 1, 4, 0, 2.8096, "REVIEW"],
+  ["D3", 3, 2, 5, 0.0048, 2.9307, "REVIEW"],
+  ["D4", 3, 3, 4, 0.0143, 2.5191, "REVIEW"],
+  ["D5", 3, 4, 3, 0.0048, 1.7252, "PREFERRED"],
+  ["E1", 4, 0, 3, 0, 1.2433, "PREFERRED"],
+  ["E2", 4, 1, 3, 0, 1.5639, "PREFERRED"],
+  ["E3", 4, 2, 3, 0, 1.6362, "PREFERRED"],
+  ["E4", 4, 3, 3, 0, 1.4378, "PREFERRED"],
+  ["E5", 4, 4, 2, 0.0083, 1.0664, "PREFERRED"],
 ].map(([id, row, col, risk, edgeDensity, circlePressure, classification]) => ({
   id: id as string,
   row: row as number,
@@ -107,1146 +75,735 @@ const zones: Zone[] = [
   risk: risk as number,
   edgeDensity: edgeDensity as number,
   circlePressure: circlePressure as number,
-  classification: classification as Classification,
+  classification: classification as Zone["classification"],
 }));
 
-const verifiedResult: AnalysisResult = {
-  filename: "curiosity_image_01.png",
-  dimensions: "500 × 500 PX",
-  imageState: "VERIFIED SAMPLE",
-  circleCandidates: 22,
-  edgePixels: 10484,
-  highRiskAreas: 8,
-  safeZones: 7,
-  recommendedZone: "E5",
-  riskScore: 2,
-  confidence: "HIGH",
-  reason:
-    "Lowest combined circular-feature pressure with sparse edge activity in the verified image pass.",
-  zones,
-};
+const circularFeatures = [
+  { id: "CF-01", x: 161, y: 214, r: 113 },
+  { id: "CF-02", x: 139, y: 244, r: 117 },
+  { id: "CF-03", x: 253, y: 203, r: 109 },
+  { id: "CF-04", x: 213, y: 194, r: 99 },
+  { id: "CF-05", x: 291, y: 208, r: 105 },
+];
 
-const riskStyle: Record<
-  Classification,
-  { bg: string; text: string; ring: string; label: string }
+const styles: Record<
+  Zone["classification"],
+  { bg: string; text: string; ring: string }
 > = {
-  Preferred: {
-    bg: "rgba(92, 137, 88, 0.48)",
-    text: "#e7f7de",
-    ring: "#b6dcaa",
-    label: "SAFE",
-  },
-  Conditional: {
-    bg: "rgba(177, 126, 43, 0.46)",
-    text: "#fff1cc",
-    ring: "#f6d895",
-    label: "REVIEW",
-  },
-  Avoid: {
-    bg: "rgba(184, 55, 39, 0.55)",
-    text: "#ffe9e4",
-    ring: "#f3a398",
-    label: "HIGH",
-  },
+  PREFERRED: { bg: "rgba(83, 126, 78, .46)", text: "#e4f5dd", ring: "#b8dbaa" },
+  REVIEW: { bg: "rgba(170, 125, 49, .45)", text: "#fff1cc", ring: "#ebd18c" },
+  AVOID: { bg: "rgba(172, 61, 45, .53)", text: "#ffe8e4", ring: "#e7998d" },
 };
 
-function zoneReason(zone: Zone) {
-  if (zone.classification === "Preferred")
-    return "Low candidate-circle pressure and an open edge profile provide the clearest available approach region.";
-  if (zone.classification === "Conditional")
-    return "Moderate detection pressure. A visual terrain review should precede any descent commitment.";
-  return "Dense terrain edges and elevated circular-feature pressure create a higher-risk descent environment.";
-}
-
-function StatusLamp({
-  label,
-  active = true,
-}: {
-  label: string;
-  active?: boolean;
-}) {
-  return (
-    <span className="inline-flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.13em] text-white/60">
-      <span
-        className={`size-1.5 rounded-full ${active ? "bg-[#68AB63] shadow-[0_0_10px_rgba(104,171,99,.8)]" : "bg-white/25"}`}
-      />
-      {label}
-    </span>
-  );
-}
-
-function RiskGrid({
-  selected,
-  onSelect,
-  visible,
-}: {
-  selected: string;
-  onSelect: (zone: string) => void;
-  visible: boolean;
-}) {
-  return (
-    <div
-      className={`absolute inset-0 grid grid-cols-5 grid-rows-5 transition-opacity duration-300 ${visible ? "opacity-100" : "pointer-events-none opacity-0"}`}
-    >
-      {zones.map(zone => {
-        const style = riskStyle[zone.classification];
-        const chosen = zone.id === selected;
-        return (
-          <button
-            key={zone.id}
-            onClick={() => onSelect(zone.id)}
-            aria-label={`${zone.id}, risk ${zone.risk} out of 10`}
-            className="relative flex min-h-0 flex-col justify-between border border-white/30 p-1 text-left transition-all duration-150 hover:brightness-125 sm:p-2"
-            style={{
-              background: style.bg,
-              color: style.text,
-              boxShadow: chosen
-                ? `inset 0 0 0 2px ${style.ring}, inset 0 0 24px rgba(0,0,0,.28)`
-                : undefined,
-            }}
-          >
-            <span className="font-mono text-[8px] uppercase tracking-[0.08em] sm:text-[10px]">
-              {zone.id}
-            </span>
-            <span className="self-end font-mono text-base font-medium tracking-[-0.08em] sm:text-xl">
-              {zone.risk}
-            </span>
-            {zone.id === "E5" && (
-              <span className="absolute bottom-1 left-1 rounded-sm bg-[#122114]/85 px-1 py-0.5 font-mono text-[6px] uppercase tracking-[0.09em] text-[#dff1d8] sm:text-[7px]">
-                primary
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
+function reason(zone: Zone) {
+  if (zone.classification === "PREFERRED")
+    return "No circular-feature intersection in the selected cell, low nearby edge density, and a comparatively open terrain footprint.";
+  if (zone.classification === "REVIEW")
+    return "Moderate terrain signal. Inspect the raw plate and adjacent cells before treating this as a viable landing alternative.";
+  return "Elevated circular-feature pressure and/or edge activity makes this cell unsuitable for the primary approach.";
 }
 
 export default function Home() {
-  const uploadRef = useRef<HTMLInputElement>(null);
-  const [stage, setStage] = useState<MissionStage>("briefing");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [stage, setStage] = useState<Stage>("results");
+  const [view, setView] = useState<View>("raw");
   const [progress, setProgress] = useState(0);
-  const [completeSteps, setCompleteSteps] = useState(0);
-  const [mode, setMode] = useState<Mode>("original");
-  const [selectedZoneId, setSelectedZoneId] = useState("E5");
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [uploadedName, setUploadedName] = useState("");
-  const [showExplainability, setShowExplainability] = useState(false);
+  const [complete, setComplete] = useState(0);
+  const [upload, setUpload] = useState<string | null>(null);
+  const [uploadName, setUploadName] = useState("");
+  const [selectedId, setSelectedId] = useState("E5");
+  const [evidenceLayer, setEvidenceLayer] = useState("RAW TERRAIN");
 
-  const result = verifiedResult;
-  const selectedZone = useMemo(
-    () =>
-      result.zones.find(zone => zone.id === selectedZoneId) ?? result.zones[24],
-    [selectedZoneId]
+  const selected = useMemo(
+    () => zones.find(zone => zone.id === selectedId) ?? zones[24],
+    [selectedId]
   );
-  const topZones = useMemo(
+  const ranking = useMemo(
     () =>
-      result.zones
-        .filter(zone => zone.classification === "Preferred")
+      [...zones]
         .sort((a, b) => a.risk - b.risk || a.circlePressure - b.circlePressure)
-        .slice(0, 3),
+        .slice(0, 5),
     []
   );
-  const currentImage =
-    uploadedImage ?? (mode === "hazards" ? assets.hazards : assets.original);
+  const sourceName = upload ? uploadName : "curiosity_image_01.png";
+  const primaryImage =
+    upload ?? (view === "hazards" ? assets.hazards : assets.raw);
+  const isVerified = !upload;
 
-  const scrollTo = (id: string) =>
+  const scroll = (id: string) =>
     document
       .querySelector(id)
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
 
-  const startAnalysis = (forceDemo?: unknown) => {
-    const isDemo = forceDemo === true;
-    if (uploadedImage && !isDemo) {
+  const runAnalysis = (forceSample = false) => {
+    if (upload && !forceSample) {
       setStage("processing");
       setProgress(0);
-      setCompleteSteps(0);
-      [18, 39, 62, 78].forEach((value, index) =>
+      setComplete(0);
+      [22, 47, 74, 100].forEach((value, index) =>
         window.setTimeout(
           () => {
             setProgress(value);
-            setCompleteSteps(index + 1);
+            setComplete(index + 1);
           },
-          (index + 1) * 360
+          (index + 1) * 420
         )
       );
-      window.setTimeout(() => {
-        setProgress(100);
-        setCompleteSteps(4);
-        setStage("awaiting-api");
-      }, 1840);
+      window.setTimeout(() => setStage("awaiting-api"), 1780);
       return;
     }
     setStage("processing");
     setProgress(0);
-    setCompleteSteps(0);
-    [16, 34, 56, 77, 92, 100].forEach((value, index) =>
+    setComplete(0);
+    [14, 31, 50, 68, 84, 100].forEach((value, index) =>
       window.setTimeout(
         () => {
           setProgress(value);
-          setCompleteSteps(index + 1);
+          setComplete(index + 1);
           if (index === 5) {
             setStage("results");
-            setMode("risk");
-            toast.success("Landing assessment ready", {
+            setView("raw");
+            toast.success("Verified analysis ready", {
               description:
-                "Zone E5 is the recommended site in the verified sample.",
+                "The terrain evidence, risk grid, and zone ranking are available for review.",
             });
-            window.setTimeout(() => scrollTo("#results"), 180);
+            window.setTimeout(() => scroll("#evidence"), 180);
           }
         },
-        (index + 1) * 390
+        (index + 1) * 310
       )
     );
   };
 
-  const runDemo = () => {
-    setUploadedImage(null);
-    setUploadedName("");
-    setSelectedZoneId("E5");
-    scrollTo("#analysis");
-    window.setTimeout(() => startAnalysis(true), 320);
+  const loadSample = () => {
+    setUpload(null);
+    setUploadName("");
+    setSelectedId("E5");
+    runAnalysis(true);
   };
 
   const handleUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      toast.error("Image file required", {
-        description:
-          "Choose a JPG, PNG, WEBP, or another browser-readable image.",
-      });
+      toast.error("Image file required");
       return;
     }
-    setUploadedImage(URL.createObjectURL(file));
-    setUploadedName(file.name);
-    setStage("acquired");
+    setUpload(URL.createObjectURL(file));
+    setUploadName(file.name);
+    setStage("mission");
+    setView("raw");
     setProgress(0);
-    setCompleteSteps(0);
-    setMode("original");
-    toast.success("Terrain image acquired", {
+    setComplete(0);
+    toast.success("Terrain image selected", {
       description:
-        "Your plate is staged. Run the mission sequence to prepare it for a future OpenCV API pass.",
+        "The image is staged for a future server-side OpenCV analysis pass.",
     });
-    window.setTimeout(() => scrollTo("#analysis"), 140);
   };
 
-  const resetMission = () => {
-    setStage("briefing");
+  const reset = () => {
+    setStage("mission");
+    setUpload(null);
+    setUploadName("");
     setProgress(0);
-    setCompleteSteps(0);
-    setUploadedImage(null);
-    setUploadedName("");
-    setMode("original");
-    setSelectedZoneId("E5");
-    setShowExplainability(false);
-    scrollTo("#analysis");
+    setComplete(0);
+    setView("raw");
+    setSelectedId("E5");
+    scroll("#mission");
   };
 
   const exportReport = () => {
     const report = {
-      mission: "MARSBOUND-01",
-      target: "MARS",
-      source_image: result.filename,
-      image_state: result.imageState,
-      detection: {
-        circular_feature_candidates: result.circleCandidates,
-        canny_edge_pixels: result.edgePixels,
-      },
-      recommended_zone: selectedZone.id,
-      risk_score: `${selectedZone.risk}/10`,
-      confidence: "HIGH",
-      reason: zoneReason(selectedZone),
-      scoring_method:
-        "0.32 × normalized edge density + 0.68 × normalized circular-feature pressure",
+      mission: "MB-01",
+      source_image: sourceName,
+      evidence_state: isVerified ? "verified OpenCV sample" : "staged upload",
+      circular_feature_candidates: 22,
+      edge_pixels: 10484,
+      risk_engine:
+        "0.32 × normalized edge density + 0.68 × circular-feature pressure",
+      recommended_zone: selected.id,
+      risk_score: `${selected.risk.toFixed(1)} / 10`,
+      reason: reason(selected),
     };
     const blob = new Blob([JSON.stringify(report, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `marsbound-${selectedZone.id}-mission-report.json`;
-    link.click();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `marsbound-${selected.id}-analysis.json`;
+    anchor.click();
     URL.revokeObjectURL(url);
-    toast.success("Mission report exported");
+    toast.success("Analysis report exported");
   };
 
-  const workflow = [
-    "IMAGE ACQUIRED",
-    "TERRAIN NORMALIZED",
-    "CIRCULAR FEATURE DETECTION",
+  const processingSteps = [
+    "IMAGE RECEIVED",
+    "TERRAIN PREPROCESSED",
     "ROCK EDGE DETECTION",
-    "RISK FIELD GENERATION",
-    "LANDING ZONE RANKING",
+    "CIRCULAR FEATURE DETECTION",
+    "RISK MAP GENERATED",
+    "LANDING ZONES RANKED",
   ];
+  const evidence = [
+    {
+      label: "RAW TERRAIN",
+      image: assets.raw,
+      description: "Original 500 × 500 source plate.",
+    },
+    {
+      label: "PREPROCESSING",
+      image: assets.normalized,
+      description: "Grayscale contrast-normalized working image.",
+    },
+    {
+      label: "ROCK EDGES",
+      image: assets.edges,
+      description: "Canny response overlaid in restrained red.",
+    },
+    {
+      label: "CIRCULAR FEATURES",
+      image: assets.circles,
+      description: "Hough circle candidates and centers.",
+    },
+    {
+      label: "COMBINED HAZARDS",
+      image: assets.hazards,
+      description: "Saved OpenCV annotated output.",
+    },
+  ];
+  const selectedEvidence =
+    evidence.find(item => item.label === evidenceLayer) ?? evidence[0];
 
   return (
-    <main className="min-h-screen bg-[#050505] text-[#F3F0E9] selection:bg-[#E13C2E] selection:text-white">
+    <main className="min-h-screen bg-[#070707] text-[#F2F0EA]">
       <input
-        ref={uploadRef}
-        onChange={handleUpload}
-        accept="image/*"
+        ref={inputRef}
         type="file"
         className="hidden"
+        accept="image/*"
+        onChange={handleUpload}
       />
-
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050505]/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-[72px] max-w-[1540px] items-center justify-between px-5 sm:px-8 lg:px-12">
-          <a
-            href="#top"
-            className="flex items-center gap-3"
-            aria-label="MARSBOUND home"
-          >
-            <img
-              src={assets.mark}
-              alt="MARSBOUND landing-reticle mark"
-              className="size-11 object-contain"
-            />
+      <header className="border-b border-white/12 bg-[#070707]">
+        <div className="mx-auto flex h-[68px] max-w-[1500px] items-center justify-between px-5 sm:px-8 lg:px-10">
+          <a href="#mission" className="flex items-center gap-3">
+            <img src={assets.mark} alt="MARSBOUND mark" className="size-9" />
             <div>
-              <p className="font-tech text-sm font-medium tracking-[0.16em] text-white">
+              <p className="font-tech text-sm font-medium tracking-[.16em] text-white">
                 MARSBOUND
               </p>
-              <p className="mt-0.5 font-mono text-[8px] uppercase tracking-[0.18em] text-white/45">
+              <p className="font-mono text-[8px] uppercase tracking-[.16em] text-white/45">
                 Landing Site Intelligence
               </p>
             </div>
           </a>
-          <nav className="hidden items-center gap-7 font-mono text-[10px] uppercase tracking-[0.15em] text-white/60 md:flex">
+          <nav className="hidden items-center gap-7 font-mono text-[10px] uppercase tracking-[.14em] text-white/55 md:flex">
             <a href="#mission" className="hover:text-white">
               Mission
             </a>
             <a href="#analysis" className="hover:text-white">
-              Analyze
+              Analysis
             </a>
-            <a href="#how" className="hover:text-white">
-              How it works
+            <a href="#evidence" className="hover:text-white">
+              Evidence
             </a>
-            <a href="#results" className="hover:text-white">
-              Results
+            <a href="#report" className="hover:text-white">
+              Report
             </a>
           </nav>
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:block">
-              <StatusLamp label="Mission status: online" />
+          <div className="flex items-center gap-3 font-mono text-[9px] uppercase tracking-[.13em]">
+            <span className="hidden text-white/50 sm:block">MISSION MB-01</span>
+            <span className="inline-flex items-center gap-2 text-[#9BD392]">
+              <span className="size-1.5 rounded-full bg-[#69AB63]" />
+              SYSTEM READY
             </span>
-            <Button
-              onClick={runDemo}
-              className="mission-cta relative h-9 overflow-hidden rounded-none border border-[#E13C2E] bg-[#E13C2E] px-3 font-mono text-[9px] uppercase tracking-[0.13em] text-white hover:bg-[#f14b3d]"
-            >
-              Run demo <Play className="ml-2 size-3 fill-current" />
-            </Button>
           </div>
         </div>
       </header>
 
-      <section
-        id="top"
-        className="relative isolate min-h-[calc(100vh-72px)] overflow-hidden border-b border-white/10"
-      >
-        <img
-          src={assets.hero}
-          alt="Cinematic Martian valley for a landing-site briefing"
-          className="mars-hero absolute inset-0 -z-20 h-full w-full object-cover"
-        />
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(5,5,5,.96)_0%,rgba(5,5,5,.78)_35%,rgba(5,5,5,.25)_72%,rgba(5,5,5,.68)_100%)]" />
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(0deg,rgba(5,5,5,.9)_0%,transparent_32%)]" />
-        <div className="absolute left-[8%] top-[14%] h-[1px] w-[170px] bg-[#E13C2E]" />
-        <div className="pointer-events-none absolute right-[7%] top-[14%] hidden w-[310px] opacity-80 lg:block">
-          <DescentSignal />
-        </div>
-        <div className="absolute bottom-10 right-6 hidden items-end gap-3 font-mono text-[9px] uppercase tracking-[0.17em] text-white/50 lg:flex">
-          <span className="size-2 rounded-full border border-white/40" />
-          <span>Target lock / Mars</span>
-          <span className="h-px w-20 bg-white/25" />
-        </div>
-        <div className="relative mx-auto flex min-h-[calc(100vh-72px)] max-w-[1540px] items-center px-5 py-20 sm:px-8 lg:px-12">
-          <div className="max-w-3xl">
-            <p className="hero-reveal font-mono text-[10px] uppercase tracking-[0.22em] text-[#FF887D]">
-              MARSBOUND // LANDING SITE INTELLIGENCE
-            </p>
-            <h1 className="hero-reveal delay-1 mt-6 max-w-3xl font-tech text-[clamp(3.7rem,8.4vw,8.7rem)] font-medium leading-[0.88] tracking-[-0.07em] text-white">
-              Find the safest ground before touchdown.
-            </h1>
-            <p className="hero-reveal delay-2 mt-7 max-w-xl text-base leading-7 text-white/70 sm:text-lg">
-              Computer vision and terrain-risk analysis for autonomous Martian
-              landing-site selection. See the evidence. Rank the ground. Commit
-              with clarity.
-            </p>
-            <div className="hero-reveal delay-3 mt-10 flex flex-wrap gap-3">
-              <Button
-                onClick={() => scrollTo("#analysis")}
-                className="mission-cta relative h-12 overflow-hidden rounded-none bg-[#E13C2E] px-5 font-mono text-[10px] uppercase tracking-[0.14em] hover:bg-[#F14B3D]"
-              >
-                Begin mission analysis <ArrowRight className="ml-3 size-4" />
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => scrollTo("#how")}
-                className="h-12 rounded-none border-white/35 bg-black/20 px-5 font-mono text-[10px] uppercase tracking-[0.14em] text-white hover:bg-white hover:text-black"
-              >
-                View how it works
-              </Button>
-            </div>
-          </div>
-          <div className="absolute right-5 top-[62%] hidden w-[280px] border border-white/20 bg-black/55 p-4 backdrop-blur-sm lg:block">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[8px] uppercase tracking-[0.16em] text-[#FF887D]">
-                Demo recommendation
-              </span>
-              <span className="size-1.5 rounded-full bg-[#68AB63] shadow-[0_0_9px_rgba(104,171,99,.9)]" />
-            </div>
-            <div className="mt-4 flex items-end justify-between">
-              <div>
-                <p className="font-tech text-3xl tracking-[-0.06em] text-white">
-                  ZONE E5
-                </p>
-                <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-[#B6DDB0]">
-                  Risk 02 / 10 · recommended
-                </p>
-              </div>
-              <div className="size-12">
-                <DescentSignal compact />
-              </div>
-            </div>
-          </div>
-          <div className="absolute bottom-7 left-5 flex items-end gap-10 sm:left-8 lg:left-12">
-            <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/65">
-              <p className="text-white/35">Mission</p>
-              <p className="mt-1 text-base text-white">MB-01</p>
-            </div>
-            <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/65">
-              <p className="text-white/35">Target</p>
-              <p className="mt-1 text-base text-white">Mars</p>
-            </div>
-            <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/65">
-              <p className="text-white/35">System</p>
-              <p className="mt-1 text-base text-white">Safety</p>
-            </div>
-            <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/65">
-              <p className="text-white/35">Status</p>
-              <p className="mt-1 flex items-center gap-2 text-base text-[#9CD194]">
-                <span className="size-1.5 rounded-full bg-[#68AB63]" />
-                Ready
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => scrollTo("#mission")}
-            aria-label="Scroll to mission analysis"
-            className="absolute bottom-7 right-5 flex flex-col items-center gap-2 font-mono text-[8px] uppercase tracking-[0.16em] text-white/50 sm:right-8 lg:right-12"
-          >
-            <span>Scroll</span>
-            <ChevronDown className="mars-scroll size-4" />
-          </button>
-        </div>
-      </section>
-
-      <section
-        id="mission"
-        className="border-b border-white/10 bg-[#090909] py-5"
-      >
-        <div className="mx-auto grid max-w-[1540px] gap-4 px-5 sm:grid-cols-4 sm:px-8 lg:px-12">
-          <StatusLamp label="Mission // Marsbound-01" />
-          <StatusLamp label="Terrain model // OpenCV" />
-          <StatusLamp label="Risk engine // Active" />
-          <StatusLamp label="Data path // Local sample" />
-        </div>
-      </section>
-
-      <section
-        id="analysis"
-        className="relative overflow-hidden bg-[#080808] py-20 sm:py-28"
-      >
-        <div
-          className="absolute inset-0 opacity-[.16]"
-          style={{
-            backgroundImage: `url(${assets.darkGrid})`,
-            backgroundSize: "cover",
-          }}
-        />
-        <div className="relative mx-auto max-w-[1540px] px-5 sm:px-8 lg:px-12">
-          <div className="max-w-3xl">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F17064]">
-              01 // Mission analysis
-            </p>
-            <h2 className="mt-4 font-tech text-5xl tracking-[-0.06em] text-white sm:text-6xl">
-              Acquire terrain. Begin assessment.
-            </h2>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-white/60">
-              Upload a terrain plate for a future API-backed OpenCV pass, or
-              load the verified Curiosity test plate to experience the complete
-              hazard, risk, and recommendation workflow now.
-            </p>
-          </div>
-          <div className="mt-12 grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(340px,.8fr)]">
-            <div className="relative overflow-hidden border border-white/15 bg-[#0C0C0C] p-5 sm:p-7">
-              <div className="absolute right-0 top-0 h-14 w-14 border-b border-l border-white/10" />
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/45">
-                    Image acquisition bay
-                  </p>
-                  <h3 className="mt-2 font-tech text-3xl tracking-[-0.04em] text-white">
-                    {uploadedImage
-                      ? "Terrain plate staged"
-                      : "Load a terrain image"}
-                  </h3>
-                </div>
-                <Upload className="size-5 text-[#E13C2E]" />
-              </div>
-              <div
-                className={`mt-7 grid min-h-[270px] place-items-center border border-dashed ${uploadedImage ? "border-[#68AB63]/60 bg-[#111]" : "border-white/25 bg-[linear-gradient(135deg,rgba(255,255,255,.025)_25%,transparent_25%,transparent_50%,rgba(255,255,255,.025)_50%,rgba(255,255,255,.025)_75%,transparent_75%)] bg-[length:16px_16px]"}`}
-              >
-                {uploadedImage ? (
-                  <div className="relative h-full w-full min-h-[270px] overflow-hidden">
-                    <img
-                      src={uploadedImage}
-                      alt="Uploaded terrain preview"
-                      className="absolute inset-0 h-full w-full object-contain"
-                    />
-                    <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/75 px-4 py-3 font-mono text-[10px] uppercase tracking-[0.13em] text-white/75">
-                      <span>{uploadedName}</span>
-                      <span className="text-[#9CD194]">Acquired</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="px-5 text-center">
-                    <FileImage className="mx-auto size-9 text-white/50" />
-                    <p className="mt-5 font-mono text-sm uppercase tracking-[0.15em] text-white">
-                      Drop terrain image
-                    </p>
-                    <p className="mt-3 text-sm text-white/50">
-                      or select a file from system
-                    </p>
-                    <p className="mt-7 font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">
-                      JPG / PNG / WEBP · MAX SIZE 25 MB
-                    </p>
-                  </div>
-                )}
-              </div>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <Button
-                  onClick={() => uploadRef.current?.click()}
-                  variant="outline"
-                  className="h-11 rounded-none border-white/25 bg-transparent px-4 font-mono text-[10px] uppercase tracking-[0.13em] text-white hover:bg-white hover:text-black"
-                >
-                  <Upload className="mr-2 size-4" /> Select image
-                </Button>
-                <Button
-                  onClick={runDemo}
-                  className="mission-cta relative h-11 overflow-hidden rounded-none bg-white px-4 font-mono text-[10px] uppercase tracking-[0.13em] text-black hover:bg-[#E13C2E] hover:text-white"
-                >
-                  <Play className="mr-2 size-3.5 fill-current" /> Load sample
-                  Mars image
-                </Button>
-              </div>
-            </div>
-            <div className="border border-white/15 bg-[#0C0C0C] p-5 sm:p-7">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/45">
-                    System queue
-                  </p>
-                  <h3 className="mt-2 font-tech text-3xl tracking-[-0.04em] text-white">
-                    Mission control
-                  </h3>
-                </div>
-                <Activity className="size-5 text-[#E13C2E]" />
-              </div>
-              <div className="mt-7 space-y-3 border-t border-white/10 pt-5">
-                <div className="flex justify-between font-mono text-[10px] uppercase tracking-[0.13em] text-white/50">
-                  <span>Input</span>
-                  <span
-                    className={
-                      uploadedImage || stage === "results"
-                        ? "text-[#9CD194]"
-                        : "text-white/30"
-                    }
-                  >
-                    {uploadedImage
-                      ? "staged upload"
-                      : stage === "results"
-                        ? "verified sample"
-                        : "awaiting plate"}
-                  </span>
-                </div>
-                <div className="flex justify-between font-mono text-[10px] uppercase tracking-[0.13em] text-white/50">
-                  <span>Processing profile</span>
-                  <span className="text-white/75">Canny + Hough</span>
-                </div>
-                <div className="flex justify-between font-mono text-[10px] uppercase tracking-[0.13em] text-white/50">
-                  <span>Grid resolution</span>
-                  <span className="text-white/75">5 × 5 zones</span>
-                </div>
-                <div className="flex justify-between font-mono text-[10px] uppercase tracking-[0.13em] text-white/50">
-                  <span>Analysis status</span>
-                  <span
-                    className={
-                      stage === "results"
-                        ? "text-[#9CD194]"
-                        : stage === "processing"
-                          ? "text-[#F0C56B]"
-                          : "text-white/75"
-                    }
-                  >
-                    {stage === "results"
-                      ? "complete"
-                      : stage === "processing"
-                        ? "running"
-                        : stage === "awaiting-api"
-                          ? "API required"
-                          : "ready"}
-                  </span>
-                </div>
-              </div>
-              <Button
-                onClick={startAnalysis}
-                disabled={stage === "processing"}
-                className="mt-8 h-12 w-full rounded-none bg-[#E13C2E] font-mono text-[10px] uppercase tracking-[0.14em] text-white hover:bg-[#F14B3D] disabled:opacity-50"
-              >
-                {stage === "processing" ? (
-                  <>
-                    <LoaderCircle className="mr-2 size-4 animate-spin" />{" "}
-                    Analyzing terrain // {progress}%
-                  </>
-                ) : (
-                  <>
-                    <ScanLine className="mr-2 size-4" /> Run terrain analysis
-                  </>
-                )}
-              </Button>
-              <p className="mt-4 text-xs leading-5 text-white/40">
-                The bundled sample returns a saved, verified OpenCV result.
-                Uploaded images are staged for the API contract described in the
-                mission flow.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {(stage === "processing" || stage === "awaiting-api") && (
-        <section className="border-y border-white/10 bg-[#0A0A0A] py-14">
-          <div className="mx-auto max-w-[1540px] px-5 sm:px-8 lg:px-12">
-            <div className="grid gap-8 lg:grid-cols-[.7fr_1.3fr]">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#F17064]">
-                  Mission analysis
-                </p>
-                <h2 className="mt-3 font-tech text-4xl tracking-[-0.06em] text-white">
-                  {stage === "awaiting-api"
-                    ? "Terrain staged. Analysis endpoint required."
-                    : "Reading the terrain..."}
-                </h2>
-                <p className="mt-4 text-sm leading-6 text-white/60">
-                  {stage === "awaiting-api"
-                    ? "The user-provided plate is preserved locally. Connect the OpenCV backend to return verified hazards, zones, and a recommendation for this specific image."
-                    : "The verified demo runs a cinematic sequence over the saved OpenCV result."}
-                </p>
-              </div>
-              <div className="border border-white/15 bg-[#0C0C0C] p-5 sm:p-7">
-                <div className="mb-6 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.15em] text-white/55">
-                  <span>Analyzing terrain</span>
-                  <span className="text-white">{progress}%</span>
-                </div>
-                <div className="h-1.5 overflow-hidden bg-white/10">
-                  <div
-                    className="h-full bg-[#E13C2E] transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-                <div className="mt-7 grid gap-3 sm:grid-cols-2">
-                  {workflow.map((item, index) => (
-                    <div
-                      key={item}
-                      className="flex items-center gap-3 border-b border-white/10 py-2 font-mono text-[10px] uppercase tracking-[0.11em] text-white/55"
-                    >
-                      {index < completeSteps ? (
-                        <Check className="size-3.5 text-[#8BC97D]" />
-                      ) : index === completeSteps && stage === "processing" ? (
-                        <LoaderCircle className="size-3.5 animate-spin text-[#F0C56B]" />
-                      ) : (
-                        <span className="size-3.5 rounded-full border border-white/25" />
-                      )}
-                      <span
-                        className={index < completeSteps ? "text-white" : ""}
-                      >
-                        {item}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {stage === "results" && (
-        <section
-          id="results"
-          className="relative overflow-hidden bg-[#070707] py-20 sm:py-28"
-        >
-          <div
-            className="absolute inset-0 opacity-[.12]"
-            style={{
-              backgroundImage: `url(${assets.darkGrid})`,
-              backgroundSize: "cover",
-            }}
-          />
-          <div className="relative mx-auto max-w-[1540px] px-5 sm:px-8 lg:px-12">
-            <div className="mb-10 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F17064]">
-                  02 // Terrain assessment complete
-                </p>
-                <h2 className="mt-4 font-tech text-5xl tracking-[-0.065em] text-white sm:text-6xl">
-                  Landing evidence, resolved.
-                </h2>
-              </div>
-              <div className="border-l border-[#E13C2E] pl-4">
-                <p className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/40">
-                  Analysis state
-                </p>
-                <p className="mt-1 font-mono text-xs uppercase tracking-[0.13em] text-[#9CD194]">
-                  Verified sample output // ready for review
-                </p>
-              </div>
-            </div>
-            <div className="grid gap-5 md:grid-cols-4">
-              <Metric
-                label="Circular feature candidates"
-                value={`${result.circleCandidates}`}
-                note="Hough circle detections"
-              />
-              <Metric
-                label="Rock edge response"
-                value={result.edgePixels.toLocaleString()}
-                note="Canny edge pixels"
-              />
-              <Metric
-                label="High-risk cells"
-                value={`${result.highRiskAreas}`}
-                note="risk score 6 and above"
-              />
-              <Metric
-                label="Preferred zones"
-                value={`${result.safeZones}`}
-                note="risk score 3 and below"
-              />
-            </div>
-            <RecommendationClimax
-              zone={selectedZone}
-              onInspect={() => setMode("zones")}
-            />
-            <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-              <article className="border border-white/15 bg-[#0B0B0B] p-3 shadow-[0_25px_70px_rgba(0,0,0,.38)] sm:p-5">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className="grid size-9 place-items-center border border-white/15 bg-white/5">
-                      <Radar className="size-4 text-[#F17064]" />
-                    </span>
-                    <div>
-                      <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-white/40">
-                        Analysis viewport
-                      </p>
-                      <p className="mt-0.5 font-mono text-[11px] uppercase tracking-[0.1em] text-white/80">
-                        {result.filename} // {result.dimensions}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="border border-[#8BC97D]/40 bg-[#8BC97D]/10 px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em] text-[#A9DB9D]">
-                    OpenCV verified
-                  </span>
-                </div>
-                <div className="relative aspect-square overflow-hidden border border-white/10 bg-black">
-                  <img
-                    src={currentImage}
-                    alt="Mars terrain analysis result"
-                    className={`absolute inset-0 h-full w-full object-cover ${mode === "zones" ? "opacity-45" : ""}`}
-                  />
-                  {mode === "risk" && (
-                    <RiskGrid
-                      selected={selectedZoneId}
-                      onSelect={setSelectedZoneId}
-                      visible
-                    />
-                  )}
-                  {mode === "zones" && (
-                    <>
-                      <RiskGrid
-                        selected={selectedZoneId}
-                        onSelect={setSelectedZoneId}
-                        visible
-                      />
-                      <div className="absolute inset-0 pointer-events-none">
-                        <div className="absolute bottom-[2%] left-[80%] grid size-[18%] place-items-center border-2 border-[#D9F0D1] bg-[#68AB63]/25 text-center shadow-[0_0_30px_rgba(104,171,99,.55)]">
-                          <div>
-                            <MapPin className="mx-auto size-5 text-[#E7F7DE]" />
-                            <span className="mt-1 block font-mono text-[9px] uppercase tracking-[0.12em] text-[#E7F7DE]">
-                              E5
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {(["original", "hazards", "risk", "zones"] as Mode[]).map(
-                    item => (
-                      <button
-                        key={item}
-                        onClick={() => setMode(item)}
-                        className={`border px-3 py-2 font-mono text-[9px] uppercase tracking-[0.13em] transition-colors ${mode === item ? "border-[#E13C2E] bg-[#E13C2E] text-white" : "border-white/15 text-white/55 hover:border-white/55 hover:text-white"}`}
-                      >
-                        {item === "original"
-                          ? "Original"
-                          : item === "hazards"
-                            ? "Hazards"
-                            : item === "risk"
-                              ? "Risk map"
-                              : "Landing zones"}
-                      </button>
-                    )
-                  )}
-                </div>
-              </article>
-              <aside className="flex flex-col border border-white/15 bg-[#0B0B0B] p-5 sm:p-7">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.17em] text-[#F17064]">
-                      Primary recommendation
-                    </p>
-                    <h3 className="mt-3 font-tech text-4xl tracking-[-0.06em] text-white">
-                      LANDING ZONE {selectedZone.id}
-                    </h3>
-                  </div>
-                  <ShieldCheck className="size-6 text-[#9CD194]" />
-                </div>
-                <div className="mt-6 border border-[#7BB372]/50 bg-[#151F15] p-5">
-                  <div className="flex items-end justify-between">
-                    <div>
-                      <p className="font-mono text-[9px] uppercase tracking-[0.15em] text-[#A6D69D]">
-                        Risk score
-                      </p>
-                      <p className="mt-2 font-tech text-6xl leading-none tracking-[-0.09em] text-[#E8F6E3]">
-                        {selectedZone.risk}
-                        <span className="ml-2 font-mono text-base tracking-normal">
-                          / 10
-                        </span>
-                      </p>
-                    </div>
-                    <span className="border border-[#8BC97D]/60 px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em] text-[#A9DB9D]">
-                      Recommended
-                    </span>
-                  </div>
-                  <p className="mt-4 text-sm leading-6 text-[#C5DBC0]">
-                    {zoneReason(selectedZone)}
-                  </p>
-                </div>
-                <div className="mt-6 space-y-4 border-t border-white/10 pt-5">
-                  <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.13em] text-white/50">
-                    <span>Hazard density</span>
-                    <span className="text-[#9CD194]">LOW</span>
-                  </div>
-                  <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.13em] text-white/50">
-                    <span>Circle proximity</span>
-                    <span className="text-[#9CD194]">LOW</span>
-                  </div>
-                  <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.13em] text-white/50">
-                    <span>Rock edge load</span>
-                    <span className="text-[#9CD194]">SPARSE</span>
-                  </div>
-                  <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.13em] text-white/50">
-                    <span>Clear area</span>
-                    <span className="text-[#9CD194]">HIGH</span>
-                  </div>
-                </div>
-                <Button
-                  onClick={() => setShowExplainability(current => !current)}
-                  variant="outline"
-                  className="mt-7 h-11 w-full rounded-none border-white/20 bg-transparent font-mono text-[10px] uppercase tracking-[0.13em] text-white hover:bg-white hover:text-black"
-                >
-                  <Info className="mr-2 size-4" />{" "}
-                  {showExplainability
-                    ? "Hide rationale"
-                    : `Why ${selectedZone.id}?`}
-                </Button>
-                {showExplainability && (
-                  <div className="mt-4 border-l-2 border-[#E13C2E] bg-white/[.03] p-4 text-sm leading-6 text-white/65">
-                    The ranking combines normalized edge density (32%) with
-                    circular-feature pressure (68%). {selectedZone.id} has the
-                    lowest resulting score of all 25 candidate cells in the
-                    saved image pass.
-                  </div>
-                )}
-              </aside>
-            </div>
-            <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-              <div className="border border-white/15 bg-[#0B0B0B] p-5 sm:p-7">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.17em] text-white/45">
-                      Landing zone assessment
-                    </p>
-                    <h3 className="mt-2 font-tech text-3xl tracking-[-0.05em] text-white">
-                      Ranked approach options
-                    </h3>
-                  </div>
-                  <Grid3X3 className="size-5 text-[#F17064]" />
-                </div>
-                <div className="mt-6 divide-y divide-white/10">
-                  {topZones.map((zone, index) => (
-                    <button
-                      onClick={() => {
-                        setSelectedZoneId(zone.id);
-                        setMode("zones");
-                      }}
-                      key={zone.id}
-                      className={`grid w-full grid-cols-[34px_1fr_auto_auto] items-center gap-4 px-2 py-4 text-left transition-colors hover:bg-white/[.035] ${zone.id === selectedZone.id ? "bg-[#68AB63]/[.09]" : ""}`}
-                    >
-                      <span className="font-mono text-[10px] text-white/35">
-                        0{index + 1}
-                      </span>
-                      <span className="font-tech text-2xl tracking-[-0.05em] text-white">
-                        {zone.id}
-                      </span>
-                      <span className="font-mono text-[10px] uppercase tracking-[0.13em] text-white/55">
-                        Risk {zone.risk}/10
-                      </span>
-                      <span className="border border-[#8BC97D]/50 px-2 py-1 font-mono text-[8px] uppercase tracking-[0.13em] text-[#A9DB9D]">
-                        {index === 0 ? "Recommended" : "Alternate"}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="border border-white/15 bg-[#0B0B0B] p-5 sm:p-7">
-                <p className="font-mono text-[10px] uppercase tracking-[0.17em] text-[#F17064]">
-                  Mission report
-                </p>
-                <div className="mt-5 grid grid-cols-2 gap-y-5 font-mono text-[10px] uppercase tracking-[0.12em]">
-                  <div className="text-white/45">Mission</div>
-                  <div className="text-right text-white">MARSBOUND-01</div>
-                  <div className="text-white/45">Target</div>
-                  <div className="text-right text-white">Mars</div>
-                  <div className="text-white/45">Image</div>
-                  <div className="text-right text-white">{result.filename}</div>
-                  <div className="text-white/45">Detection</div>
-                  <div className="text-right text-white">
-                    {result.circleCandidates} circles
-                  </div>
-                  <div className="text-white/45">Zone</div>
-                  <div className="text-right text-[#A9DB9D]">
-                    {selectedZone.id}
-                  </div>
-                  <div className="text-white/45">Risk</div>
-                  <div className="text-right text-[#A9DB9D]">
-                    {selectedZone.risk}/10
-                  </div>
-                </div>
-                <Button
-                  onClick={exportReport}
-                  className="mt-7 h-11 w-full rounded-none bg-white font-mono text-[10px] uppercase tracking-[0.13em] text-black hover:bg-[#E13C2E] hover:text-white"
-                >
-                  <ArrowDownToLine className="mr-2 size-4" /> Export analysis
-                </Button>
-                <button
-                  onClick={resetMission}
-                  className="mt-4 flex w-full items-center justify-center gap-2 font-mono text-[9px] uppercase tracking-[0.14em] text-white/45 transition-colors hover:text-white"
-                >
-                  <RefreshCw className="size-3.5" /> New analysis
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      <section
-        id="how"
-        className="border-y border-white/10 bg-[#0A0A0A] py-20 sm:py-28"
-      >
-        <div className="mx-auto max-w-[1540px] px-5 sm:px-8 lg:px-12">
-          <div className="max-w-2xl">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F17064]">
-              03 // How it works
-            </p>
-            <h2 className="mt-4 font-tech text-5xl tracking-[-0.065em] text-white sm:text-6xl">
-              See. Score. Decide.
-            </h2>
-            <p className="mt-5 text-base leading-7 text-white/60">
-              The system’s logic is kept visible: image evidence becomes
-              hazards, hazards become risk, and risk becomes a shortlist a human
-              can interrogate.
-            </p>
-          </div>
-          <div className="descent-flow mt-12 grid gap-5 lg:grid-cols-3">
-            <ProcessCard
-              index="01"
-              icon={<ScanLine className="size-5" />}
-              title="SEE"
-              subtitle="Computer vision detects terrain hazards."
-              items={[
-                "Terrain image",
-                "Preprocessing",
-                "Canny edge response",
-                "Hough circular candidates",
-              ]}
-              accent="#E13C2E"
-            />
-            <ProcessCard
-              index="02"
-              icon={<Grid3X3 className="size-5" />}
-              title="SCORE"
-              subtitle="Risk logic converts hazards into a terrain score."
-              items={[
-                "5 × 5 candidate grid",
-                "Hazard density",
-                "Hazard distance",
-                "Weighted risk score",
-              ]}
-              accent="#F0B24B"
-            />
-            <ProcessCard
-              index="03"
-              icon={<ShieldCheck className="size-5" />}
-              title="DECIDE"
-              subtitle="The safest zones are ranked automatically."
-              items={[
-                "25 possible zones",
-                "Risk comparison",
-                "Top 3 shortlist",
-                "Recommended landing site",
-              ]}
-              accent="#8BC97D"
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-[#050505] py-20 sm:py-28">
-        <div className="mx-auto grid max-w-[1540px] gap-10 px-5 sm:px-8 lg:grid-cols-[.78fr_1.22fr] lg:px-12">
+      <section id="mission" className="border-b border-white/12">
+        <div className="mx-auto grid max-w-[1500px] gap-10 px-5 py-14 sm:px-8 lg:grid-cols-[.72fr_1.28fr] lg:px-10 lg:py-16">
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F17064]">
-              04 // Technical architecture
+            <p className="font-mono text-[10px] uppercase tracking-[.19em] text-[#E26D61]">
+              Mission / 01
             </p>
-            <h2 className="mt-4 font-tech text-5xl tracking-[-0.065em] text-white">
-              A short path from pixels to descent.
-            </h2>
+            <h1 className="mt-4 font-tech text-4xl tracking-[-.055em] text-white sm:text-5xl">
+              Landing Site Analysis
+            </h1>
             <p className="mt-5 max-w-md text-sm leading-6 text-white/60">
-              The frontend is typed around an analysis result so an OpenCV
-              service can later return verified hazards and risk zones through
-              an API without changing the mission experience.
+              Evaluate Martian terrain for potential landing zones using
+              computer vision and transparent terrain-risk analysis.
             </p>
-            <div className="mt-7 flex flex-wrap gap-2">
-              {[
-                "Python",
-                "OpenCV",
-                "NumPy",
-                "Computer Vision",
-                "Image Processing",
-                "Risk Scoring",
-                "React",
-              ].map(tag => (
-                <span
-                  key={tag}
-                  className="border border-white/15 px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/55"
-                >
-                  {tag}
-                </span>
-              ))}
+            <div className="mt-8 border-t border-white/12 pt-5 font-mono text-[9px] uppercase tracking-[.14em] text-white/45">
+              <p>Target / Mars</p>
+              <p className="mt-2">Model / OpenCV classical vision</p>
+              <p className="mt-2">Grid / 5 × 5 candidate zones</p>
             </div>
           </div>
-          <div className="relative border border-white/15 bg-[#0B0B0B] p-6 sm:p-9">
-            <ArchitectureFlow />
+          <div className="border border-white/15 bg-[#0B0B0B] p-4 sm:p-5">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <p className="font-mono text-[9px] uppercase tracking-[.15em] text-white/45">
+                  Terrain selection
+                </p>
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-[.11em] text-white/80">
+                  {sourceName}
+                </p>
+              </div>
+              <span
+                className={`font-mono text-[9px] uppercase tracking-[.13em] ${isVerified ? "text-[#9BD392]" : "text-[#F0C56B]"}`}
+              >
+                {isVerified ? "verified sample" : "staged upload"}
+              </span>
+            </div>
+            {isVerified && (
+              <div className="flex items-center justify-between border-b border-[#69AB63]/35 bg-[#0C120C] px-3 py-2 font-mono text-[9px] uppercase tracking-[.13em]">
+                <span className="text-white/55">Saved mission result</span>
+                <span className="text-[#A9DB9D]">
+                  E5 / risk 2.0 / recommended
+                </span>
+              </div>
+            )}
+            <div className="relative mt-4 aspect-[16/8] overflow-hidden border border-white/10 bg-black">
+              <img
+                src={upload ?? assets.raw}
+                alt="Selected Martian terrain"
+                className="h-full w-full object-cover opacity-90"
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,.52),transparent_45%)]" />
+              {isVerified && (
+                <LandingReticle className="absolute right-[17%] top-[31%] size-16 text-[#E26D61]" />
+              )}
+              <div className="absolute bottom-3 left-3 font-mono text-[9px] uppercase tracking-[.14em] text-white/70">
+                {upload
+                  ? "IMAGE STAGED / READY FOR API"
+                  : "CURIOUSITY TEST PLATE / SAVED RESULT AVAILABLE"}
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Button
+                onClick={() => inputRef.current?.click()}
+                variant="outline"
+                className="h-10 rounded-none border-white/25 bg-transparent font-mono text-[9px] uppercase tracking-[.13em] text-white hover:bg-white hover:text-black"
+              >
+                <Upload className="mr-2 size-3.5" /> Select terrain
+              </Button>
+              <Button
+                onClick={loadSample}
+                className="h-10 rounded-none bg-white font-mono text-[9px] uppercase tracking-[.13em] text-black hover:bg-[#E13C2E] hover:text-white"
+              >
+                <FileImage className="mr-2 size-3.5" /> Choose NASA terrain
+                sample
+              </Button>
+              <Button
+                onClick={() => runAnalysis()}
+                className="h-10 rounded-none bg-[#E13C2E] font-mono text-[9px] uppercase tracking-[.13em] text-white hover:bg-[#F04A3B]"
+              >
+                <ScanLine className="mr-2 size-3.5" /> Analyze terrain
+              </Button>
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="border-y border-white/10 bg-[#0A0A0A] py-20">
-        <div className="mx-auto max-w-[1540px] px-5 sm:px-8 lg:px-12">
-          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+      <section id="analysis" className="border-b border-white/12 bg-[#090909]">
+        <div className="mx-auto max-w-[1500px] px-5 py-12 sm:px-8 lg:px-10 lg:py-14">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#F17064]">
-                05 // The terrain data
+              <p className="font-mono text-[10px] uppercase tracking-[.19em] text-[#E26D61]">
+                Analysis / primary workspace
               </p>
-              <h2 className="mt-4 font-tech text-5xl tracking-[-0.065em] text-white">
-                Visual material for the mission.
+              <h2 className="mt-3 font-tech text-3xl tracking-[-.05em] text-white sm:text-4xl">
+                Verified descent review
               </h2>
             </div>
             <p className="max-w-md text-sm leading-6 text-white/55">
-              Sample imagery is clearly identified as demonstration material.
-              The verified Curiosity test plate is the one currently connected
-              to saved detector outputs.
+              The terrain plate remains fixed as the primary object. Visual
+              modes expose evidence derived from the same source image.
             </p>
           </div>
-          <div className="mt-10 grid gap-5 md:grid-cols-3">
-            <TerrainCard
-              image={assets.original}
-              label="Curiosity test plate"
-              meta="USER-PROVIDED SAMPLE"
-              state="VERIFIED ANALYSIS"
+          {stage === "processing" && (
+            <ProcessingPanel
+              progress={progress}
+              completed={complete}
+              steps={processingSteps}
             />
-            <TerrainCard
-              image={assets.additionalSample}
-              label="Curiosity terrain alternate"
-              meta="USER-PROVIDED SAMPLE"
-              state="AVAILABLE FOR PROCESSING"
-            />
-            <TerrainCard
-              image={assets.galleryDune}
-              label="Illustrative dune terrain"
-              meta="MISSION VISUAL"
-              state="ILLUSTRATIVE ONLY"
-            />
-          </div>
+          )}
+          {stage === "awaiting-api" && (
+            <div className="mt-8 border-l-2 border-[#F0C56B] bg-[#12110D] px-5 py-4">
+              <p className="font-mono text-[10px] uppercase tracking-[.15em] text-[#F0C56B]">
+                Server analysis required
+              </p>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-white/65">
+                The selected upload has been preserved in the browser. A backend
+                endpoint is required to return verified edge maps, circular
+                features, zones, and a landing recommendation for this file.
+              </p>
+            </div>
+          )}
+          {stage !== "results" &&
+            stage !== "processing" &&
+            stage !== "awaiting-api" && (
+              <div className="mt-8 border border-dashed border-white/20 p-8 text-center">
+                <p className="font-mono text-[10px] uppercase tracking-[.16em] text-white/45">
+                  Select a terrain image, then run analysis
+                </p>
+                <p className="mt-3 text-sm text-white/55">
+                  Use the verified sample to inspect the complete local result
+                  without a backend.
+                </p>
+              </div>
+            )}
+          {stage === "results" && (
+            <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+              <article className="border border-white/15 bg-[#0A0A0A] p-3 sm:p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+                  <div className="flex items-center gap-3">
+                    <ScanLine className="size-4 text-[#E13C2E]" />
+                    <div>
+                      <p className="font-mono text-[9px] uppercase tracking-[.15em] text-white/45">
+                        Terrain evidence viewport
+                      </p>
+                      <p className="mt-1 font-mono text-[10px] uppercase tracking-[.11em] text-white/80">
+                        {sourceName} / 500 × 500 PX
+                      </p>
+                    </div>
+                  </div>
+                  <span className="font-mono text-[9px] uppercase tracking-[.13em] text-[#9BD392]">
+                    Analysis complete
+                  </span>
+                </div>
+                <div className="relative mt-3 aspect-square overflow-hidden border border-white/10 bg-black">
+                  <img
+                    src={primaryImage}
+                    alt="Mars terrain analysis"
+                    className={`absolute inset-0 h-full w-full object-cover ${view === "zones" ? "opacity-50" : ""}`}
+                  />
+                  {isVerified && (view === "risk" || view === "zones") && (
+                    <RiskGrid selected={selectedId} onSelect={setSelectedId} />
+                  )}
+                  {view === "zones" && (
+                    <div className="pointer-events-none absolute bottom-[1%] left-[80%] grid h-[19%] w-[19%] place-items-center border-2 border-[#D6F0CF] bg-[#69AB63]/20">
+                      <div className="text-center">
+                        <MapPin className="mx-auto size-4 text-[#D6F0CF]" />
+                        <span className="font-mono text-[9px] uppercase tracking-[.14em] text-[#D6F0CF]">
+                          E5
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-px border border-white/15 bg-white/15">
+                  {(["raw", "hazards", "risk", "zones"] as View[]).map(item => (
+                    <button
+                      key={item}
+                      onClick={() => setView(item)}
+                      className={`px-4 py-2 font-mono text-[9px] uppercase tracking-[.13em] ${view === item ? "bg-white text-black" : "bg-[#0A0A0A] text-white/55 hover:text-white"}`}
+                    >
+                      {item === "raw"
+                        ? "Raw"
+                        : item === "hazards"
+                          ? "Hazards"
+                          : item === "risk"
+                            ? "Risk Map"
+                            : "Landing Zones"}
+                    </button>
+                  ))}
+                </div>
+              </article>
+              <aside className="border border-white/15 bg-[#0A0A0A]">
+                <div className="border-b border-white/10 p-5">
+                  <p className="font-mono text-[10px] uppercase tracking-[.16em] text-[#E26D61]">
+                    Analysis status
+                  </p>
+                  <h3 className="mt-2 font-tech text-2xl tracking-[-.04em] text-white">
+                    Complete
+                  </h3>
+                </div>
+                <dl className="divide-y divide-white/10">
+                  <Stat
+                    label="Circular candidates"
+                    value="22"
+                    note="Hough circle transform"
+                  />
+                  <Stat
+                    label="Edge response"
+                    value="10,484"
+                    note="Canny edge pixels"
+                  />
+                  <Stat
+                    label="Candidate zones"
+                    value="25"
+                    note="5 × 5 terrain grid"
+                  />
+                  <Stat
+                    label="Preferred zones"
+                    value="7"
+                    note="risk score ≤ 3"
+                  />
+                </dl>
+                <div className="p-5">
+                  <p className="font-mono text-[9px] uppercase tracking-[.14em] text-white/40">
+                    Source result
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-white/60">
+                    Verified local OpenCV pass. Circular candidates and edge
+                    response remain visible for review rather than being
+                    presented as confirmed geology.
+                  </p>
+                </div>
+              </aside>
+            </div>
+          )}
         </div>
       </section>
 
-      <section className="border-y border-white/10 bg-[#050505] py-14">
-        <div className="mx-auto flex max-w-[1540px] flex-col gap-6 px-5 sm:px-8 md:flex-row md:items-center md:justify-between lg:px-12">
-          <div className="flex items-start gap-4">
-            <TriangleAlert className="mt-0.5 size-5 shrink-0 text-[#F0B24B]" />
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-[#F0C56B]">
-                Mission safety note
-              </p>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-white/60">
-                MARSBOUND is a decision-support prototype. The visualized
-                evidence and scoring rule support inspection; operational
-                landing decisions also require slope, soil, illumination,
-                engineering, and mission-validation inputs.
-              </p>
-            </div>
-          </div>
-          <Button
-            onClick={runDemo}
-            className="h-11 shrink-0 rounded-none bg-[#E13C2E] font-mono text-[10px] uppercase tracking-[0.13em] hover:bg-[#F14B3D]"
+      {stage === "results" && (
+        <>
+          <section
+            id="evidence"
+            className="border-b border-white/12 bg-[#070707]"
           >
-            <Sparkles className="mr-2 size-4" /> Run demo analysis
-          </Button>
-        </div>
-      </section>
-
-      <footer className="bg-[#050505] py-10">
-        <div className="mx-auto flex max-w-[1540px] flex-col gap-8 px-5 sm:px-8 md:flex-row md:items-end md:justify-between lg:px-12">
-          <div className="flex items-center gap-3">
-            <img src={assets.mark} alt="" className="size-9" />
-            <div>
-              <p className="font-tech text-sm tracking-[0.16em] text-white">
-                MARSBOUND
-              </p>
-              <p className="mt-1 font-mono text-[8px] uppercase tracking-[0.16em] text-white/40">
-                Landing Site Intelligence System
-              </p>
+            <div className="mx-auto max-w-[1500px] px-5 py-14 sm:px-8 lg:px-10">
+              <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[.19em] text-[#E26D61]">
+                    Evidence / intermediate outputs
+                  </p>
+                  <h2 className="mt-3 font-tech text-3xl tracking-[-.05em] text-white sm:text-4xl">
+                    Inspect the algorithm, not just the answer.
+                  </h2>
+                </div>
+                <p className="max-w-md text-sm leading-6 text-white/55">
+                  Each plate is generated from the same verified source image.
+                  Select a stage to inspect its real saved output.
+                </p>
+              </div>
+              <div className="mt-8 grid gap-px border border-white/15 bg-white/15 md:grid-cols-5">
+                {evidence.map(item => (
+                  <button
+                    key={item.label}
+                    onClick={() => setEvidenceLayer(item.label)}
+                    className={`group bg-[#090909] p-3 text-left ${evidenceLayer === item.label ? "bg-[#161616]" : "hover:bg-[#111]"}`}
+                  >
+                    <div className="aspect-square overflow-hidden border border-white/10">
+                      <img
+                        src={item.image}
+                        alt={item.label}
+                        className="h-full w-full object-cover grayscale-[.18] transition-transform duration-300 group-hover:scale-105"
+                      />
+                    </div>
+                    <p className="mt-3 font-mono text-[9px] uppercase tracking-[.13em] text-white">
+                      {item.label}
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-white/45">
+                      {item.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-6 grid gap-6 lg:grid-cols-[.8fr_1.2fr]">
+                <div className="border border-white/15 p-5">
+                  <div className="relative overflow-hidden border border-white/10 bg-black">
+                    <img
+                      src={selectedEvidence.image}
+                      alt={selectedEvidence.label}
+                      className="aspect-[16/8] w-full object-cover"
+                    />
+                    <div className="absolute inset-x-0 bottom-0 bg-black/75 px-3 py-2 font-mono text-[9px] uppercase tracking-[.13em] text-white/80">
+                      {selectedEvidence.label}
+                    </div>
+                  </div>
+                  <p className="font-mono text-[10px] uppercase tracking-[.16em] text-[#E26D61]">
+                    Selected evidence / {evidenceLayer}
+                  </p>
+                  <p className="mt-4 text-sm leading-6 text-white/60">
+                    {selectedEvidence.description} Follow the sequence from RAW
+                    TERRAIN → PREPROCESSING → CANNY EDGE DETECTION → HOUGH
+                    CIRCLE DETECTION → HAZARD MAP → RISK GRID.
+                  </p>
+                </div>
+                <div className="border border-white/15">
+                  <div className="border-b border-white/10 p-5">
+                    <p className="font-mono text-[10px] uppercase tracking-[.16em] text-white/45">
+                      Circular feature coordinates
+                    </p>
+                    <p className="mt-2 text-sm text-white/60">
+                      Sample of actual Hough candidates from the verified
+                      result. Radius is measured in source pixels.
+                    </p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[520px] border-collapse font-mono text-[10px] uppercase tracking-[.1em]">
+                      <thead className="text-left text-white/40">
+                        <tr className="border-b border-white/10">
+                          <th className="px-5 py-3 font-normal">ID</th>
+                          <th className="px-5 py-3 font-normal">Type</th>
+                          <th className="px-5 py-3 font-normal">X</th>
+                          <th className="px-5 py-3 font-normal">Y</th>
+                          <th className="px-5 py-3 font-normal">Radius</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {circularFeatures.map(feature => (
+                          <tr
+                            key={feature.id}
+                            className="border-b border-white/10 text-white/70"
+                          >
+                            <td className="px-5 py-3 text-[#9BD392]">
+                              {feature.id}
+                            </td>
+                            <td className="px-5 py-3">Circular feature</td>
+                            <td className="px-5 py-3">{feature.x}</td>
+                            <td className="px-5 py-3">{feature.y}</td>
+                            <td className="px-5 py-3">{feature.r} PX</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </div>
+          </section>
+
+          <section id="report" className="bg-[#090909]">
+            <div className="mx-auto grid max-w-[1500px] gap-8 px-5 py-14 sm:px-8 lg:grid-cols-[1.1fr_.9fr] lg:px-10">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[.19em] text-[#E26D61]">
+                  Decision / landing zone ranking
+                </p>
+                <h2 className="mt-3 font-tech text-3xl tracking-[-.05em] text-white sm:text-4xl">
+                  Candidate zone assessment
+                </h2>
+                <div className="mt-7 overflow-x-auto border border-white/15">
+                  <table className="w-full min-w-[620px] border-collapse font-mono text-[10px] uppercase tracking-[.11em]">
+                    <thead className="border-b border-white/10 text-left text-white/40">
+                      <tr>
+                        <th className="px-5 py-4 font-normal">Rank</th>
+                        <th className="px-5 py-4 font-normal">Zone</th>
+                        <th className="px-5 py-4 font-normal">Risk</th>
+                        <th className="px-5 py-4 font-normal">Edge density</th>
+                        <th className="px-5 py-4 font-normal">Decision</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ranking.map((zone, index) => (
+                        <tr
+                          key={zone.id}
+                          onClick={() => {
+                            setSelectedId(zone.id);
+                            setView("zones");
+                            scroll("#analysis");
+                          }}
+                          className={`cursor-pointer border-b border-white/10 ${zone.id === selected.id ? "bg-[#69AB63]/[.08]" : "hover:bg-white/[.025]"}`}
+                        >
+                          <td className="px-5 py-4 text-white/35">
+                            {String(index + 1).padStart(2, "0")}
+                          </td>
+                          <td className="px-5 py-4 text-lg text-white">
+                            {zone.id}
+                          </td>
+                          <td className="px-5 py-4 text-[#9BD392]">
+                            {zone.risk.toFixed(1)} / 10
+                          </td>
+                          <td className="px-5 py-4 text-white/60">
+                            {(zone.edgeDensity * 100).toFixed(2)}%
+                          </td>
+                          <td className="px-5 py-4 text-white/60">
+                            {index === 0 ? "RECOMMENDED" : "ALTERNATE"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <aside className="border border-[#69AB63]/55 bg-[#0D130D] p-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-mono text-[10px] uppercase tracking-[.17em] text-[#A9DB9D]">
+                      Landing site recommended
+                    </p>
+                    <h3 className="mt-5 font-tech text-7xl leading-none tracking-[-.09em] text-white">
+                      {selected.id}
+                    </h3>
+                  </div>
+                  <ShieldCheck className="size-6 text-[#A9DB9D]" />
+                </div>
+                <div className="mt-7 border-y border-[#69AB63]/35 py-5">
+                  <p className="font-mono text-[9px] uppercase tracking-[.14em] text-white/45">
+                    Risk score
+                  </p>
+                  <p className="mt-2 font-tech text-4xl tracking-[-.06em] text-[#E7F4E2]">
+                    {selected.risk.toFixed(1)}{" "}
+                    <span className="font-mono text-sm tracking-normal">
+                      / 10
+                    </span>
+                  </p>
+                  <p className="mt-5 font-mono text-[9px] uppercase tracking-[.14em] text-[#A9DB9D]">
+                    Evidence confidence / High
+                  </p>
+                </div>
+                <div className="mt-6 space-y-3 text-sm leading-6 text-white/70">
+                  <p className="flex gap-3">
+                    <Check className="mt-1 size-4 shrink-0 text-[#A9DB9D]" />
+                    No circular-feature intersection in the selected cell.
+                  </p>
+                  <p className="flex gap-3">
+                    <Check className="mt-1 size-4 shrink-0 text-[#A9DB9D]" />
+                    Low nearby rock-edge response in the computed grid.
+                  </p>
+                  <p className="flex gap-3">
+                    <Check className="mt-1 size-4 shrink-0 text-[#A9DB9D]" />
+                    Largest open candidate area among ranked zones.
+                  </p>
+                  <p className="flex gap-3">
+                    <Check className="mt-1 size-4 shrink-0 text-[#A9DB9D]" />
+                    Lowest risk output in the verified local pass.
+                  </p>
+                </div>
+                <div className="mt-7 flex gap-3">
+                  <Button
+                    onClick={() => scroll("#evidence")}
+                    variant="outline"
+                    className="h-10 flex-1 rounded-none border-white/30 bg-transparent font-mono text-[9px] uppercase tracking-[.13em] text-white hover:bg-white hover:text-black"
+                  >
+                    <Info className="mr-2 size-3.5" /> View evidence
+                  </Button>
+                  <Button
+                    onClick={exportReport}
+                    className="h-10 flex-1 rounded-none bg-white font-mono text-[9px] uppercase tracking-[.13em] text-black hover:bg-[#E13C2E] hover:text-white"
+                  >
+                    <ArrowDownToLine className="mr-2 size-3.5" /> Export report
+                  </Button>
+                </div>
+              </aside>
+            </div>
+          </section>
+        </>
+      )}
+
+      <footer className="border-t border-white/12 bg-[#070707]">
+        <div className="mx-auto flex max-w-[1500px] flex-col gap-5 px-5 py-8 sm:px-8 md:flex-row md:items-center md:justify-between lg:px-10">
+          <div className="flex items-center gap-3">
+            <img src={assets.mark} alt="" className="size-8" />
+            <p className="font-mono text-[9px] uppercase tracking-[.15em] text-white/55">
+              MARSBOUND / Landing Site Intelligence
+            </p>
           </div>
-          <div className="font-mono text-[8px] uppercase tracking-[0.16em] text-white/35">
-            MB-LSIS // Mission Control // Terrain Safety
+          <div className="flex items-center gap-4">
+            <p className="font-mono text-[8px] uppercase tracking-[.13em] text-white/35">
+              MB-01 / OpenCV classical vision / local demo
+            </p>
+            {stage === "results" && (
+              <button
+                onClick={reset}
+                className="inline-flex items-center gap-2 font-mono text-[9px] uppercase tracking-[.13em] text-white/60 hover:text-white"
+              >
+                <RefreshCw className="size-3.5" /> New analysis
+              </button>
+            )}
           </div>
         </div>
       </footer>
@@ -1254,7 +811,64 @@ export default function Home() {
   );
 }
 
-function Metric({
+function ProcessingPanel({
+  progress,
+  completed,
+  steps,
+}: {
+  progress: number;
+  completed: number;
+  steps: string[];
+}) {
+  return (
+    <div className="mt-8 grid gap-6 border border-white/15 bg-[#0B0B0B] p-5 sm:grid-cols-[.8fr_1.2fr] sm:p-7">
+      <div>
+        <p className="font-mono text-[10px] uppercase tracking-[.17em] text-[#E26D61]">
+          Instrument sequence
+        </p>
+        <h3 className="mt-3 font-tech text-3xl tracking-[-.05em] text-white">
+          Processing terrain
+        </h3>
+        <p className="mt-3 text-sm leading-6 text-white/55">
+          Saved sample data is being surfaced through the scientific review
+          sequence.
+        </p>
+        <p className="mt-8 font-mono text-2xl tracking-[-.06em] text-white">
+          {progress}%
+        </p>
+      </div>
+      <div>
+        <div className="h-px bg-white/15">
+          <div
+            className="h-px bg-[#E13C2E] transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <div className="mt-5 grid gap-x-8 sm:grid-cols-2">
+          {steps.map((step, index) => (
+            <div
+              key={step}
+              className="flex items-center gap-3 border-b border-white/10 py-3 font-mono text-[9px] uppercase tracking-[.12em] text-white/55"
+            >
+              {index < completed ? (
+                <Check className="size-3.5 text-[#9BD392]" />
+              ) : index === completed ? (
+                <LoaderCircle className="size-3.5 animate-spin text-[#F0C56B]" />
+              ) : (
+                <span className="size-3.5 rounded-full border border-white/25" />
+              )}
+              <span className={index < completed ? "text-white" : ""}>
+                {step}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Stat({
   label,
   value,
   note,
@@ -1264,240 +878,84 @@ function Metric({
   note: string;
 }) {
   return (
-    <div className="border border-white/10 bg-white/[.025] p-5">
-      <p className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/40">
-        {label}
-      </p>
-      <p className="mt-2 font-tech text-3xl tracking-[-0.06em] text-white">
-        {value}
-      </p>
-      <p className="mt-1 text-xs text-white/45">{note}</p>
-    </div>
-  );
-}
-
-function ProcessCard({
-  index,
-  icon,
-  title,
-  subtitle,
-  items,
-  accent,
-}: {
-  index: string;
-  icon: ReactNode;
-  title: string;
-  subtitle: string;
-  items: string[];
-  accent: string;
-}) {
-  return (
-    <article className="border border-white/15 bg-[#0D0D0D] p-6 sm:p-7">
-      <div className="flex items-center justify-between">
-        <span
-          className="grid size-10 place-items-center border"
-          style={{ borderColor: `${accent}80`, color: accent }}
-        >
-          {icon}
-        </span>
-        <span className="font-mono text-[10px] text-white/35">{index}</span>
-      </div>
-      <h3 className="mt-8 font-tech text-3xl tracking-[-0.05em] text-white">
-        {title}
-      </h3>
-      <p className="mt-2 text-sm leading-6 text-white/60">{subtitle}</p>
-      <div className="mt-7 space-y-0">
-        {items.map((item, index) => (
-          <div
-            key={item}
-            className="flex items-center gap-3 border-t border-white/10 py-3 font-mono text-[9px] uppercase tracking-[0.13em] text-white/55"
-          >
-            <span
-              className="size-1.5 rounded-full"
-              style={{
-                background:
-                  index === items.length - 1 ? accent : "rgba(255,255,255,.3)",
-              }}
-            />
-            {item}
-          </div>
-        ))}
-      </div>
-    </article>
-  );
-}
-
-function ArchitectureFlow() {
-  const nodes = [
-    "Terrain image",
-    "Image preprocessing",
-    "Crater detection · Hough circles",
-    "Rock detection · Canny edges",
-    "Hazard map",
-    "Risk engine",
-    "Landing zone ranking",
-    "Mission report",
-  ];
-  return (
-    <div className="grid gap-0">
-      {nodes.map((node, index) => (
-        <div key={node} className="relative grid grid-cols-[30px_1fr] gap-4">
-          <div className="flex flex-col items-center">
-            <span
-              className={`grid size-6 place-items-center rounded-full border ${index === nodes.length - 1 ? "border-[#8BC97D] bg-[#8BC97D]/10 text-[#A9DB9D]" : "border-white/25 text-white/45"}`}
-            >
-              {index === nodes.length - 1 ? (
-                <ClipboardCheck className="size-3" />
-              ) : (
-                <span className="font-mono text-[8px]">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
-              )}
-            </span>
-            {index < nodes.length - 1 && (
-              <span className="h-6 w-px bg-white/15" />
-            )}
-          </div>
-          <div
-            className={`mb-3 border p-3 font-mono text-[10px] uppercase tracking-[0.12em] ${index === nodes.length - 1 ? "border-[#8BC97D]/50 bg-[#8BC97D]/10 text-[#C8E8C1]" : "border-white/10 bg-white/[.025] text-white/65"}`}
-          >
-            {node}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TerrainCard({
-  image,
-  label,
-  meta,
-  state,
-}: {
-  image: string;
-  label: string;
-  meta: string;
-  state: string;
-}) {
-  return (
-    <article className="group overflow-hidden border border-white/15 bg-[#0C0C0C]">
-      <div className="relative aspect-[4/3] overflow-hidden">
-        <img
-          src={image}
-          alt={label}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-        <p className="absolute bottom-3 left-3 font-mono text-[8px] uppercase tracking-[0.13em] text-white/80">
+    <div className="flex items-center justify-between gap-4 px-5 py-4">
+      <div>
+        <dt className="font-mono text-[9px] uppercase tracking-[.13em] text-white/45">
           {label}
-        </p>
+        </dt>
+        <dd className="mt-1 text-xs text-white/55">{note}</dd>
       </div>
-      <div className="grid grid-cols-2 gap-y-3 p-4 font-mono text-[8px] uppercase tracking-[0.12em]">
-        <span className="text-white/35">Source</span>
-        <span className="text-right text-white/70">{meta}</span>
-        <span className="text-white/35">Target</span>
-        <span className="text-right text-white/70">Mars</span>
-        <span className="text-white/35">Analysis</span>
-        <span className="text-right text-[#A9DB9D]">{state}</span>
-      </div>
-    </article>
+      <span className="font-tech text-3xl tracking-[-.06em] text-white">
+        {value}
+      </span>
+    </div>
   );
 }
 
-function DescentSignal({ compact = false }: { compact?: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 320 96"
-      className={`descent-signal h-full w-full ${compact ? "" : ""}`}
-      aria-hidden="true"
-    >
-      <path
-        d="M10 72 C76 18 161 12 306 55"
-        fill="none"
-        stroke="#E13C2E"
-        strokeWidth="2"
-      />
-      <path
-        d="M10 79 C83 27 169 21 306 62"
-        fill="none"
-        stroke="rgba(255,255,255,.35)"
-        strokeWidth="1"
-        strokeDasharray="3 6"
-      />
-      <circle
-        cx="226"
-        cy="39"
-        r="23"
-        fill="rgba(5,5,5,.22)"
-        stroke="#F3F0E9"
-        strokeWidth="1.5"
-      />
-      <circle
-        cx="226"
-        cy="39"
-        r="8"
-        fill="none"
-        stroke="#E13C2E"
-        strokeWidth="2"
-      />
-      <path
-        d="M226 7v15M226 56v15M194 39h15M243 39h15"
-        stroke="#F3F0E9"
-        strokeWidth="1"
-        opacity=".65"
-      />
-      <path d="M222 35h8v8h-8z" fill="#E13C2E" />
-    </svg>
-  );
-}
-
-function RecommendationClimax({
-  zone,
-  onInspect,
+function RiskGrid({
+  selected,
+  onSelect,
 }: {
-  zone: Zone;
-  onInspect: () => void;
+  selected: string;
+  onSelect: (id: string) => void;
 }) {
   return (
-    <section className="recommendation-climax relative mt-10 overflow-hidden border border-[#68AB63]/55 bg-[#0C130C] p-6 sm:p-9">
-      <div className="relative grid gap-8 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#A9DB9D]">
-            Mission decision // safest available ground
-          </p>
-          <h3 className="mt-3 font-tech text-4xl tracking-[-0.065em] text-white sm:text-5xl">
-            LANDING ZONE {zone.id}
-          </h3>
-          <p className="mt-3 max-w-md text-sm leading-6 text-white/65">
-            {zoneReason(zone)}
-          </p>
-        </div>
-        <div className="mx-auto size-36 sm:size-44">
-          <DescentSignal />
-        </div>
-        <div className="lg:text-right">
-          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#A9DB9D]">
-            Calculated terrain risk
-          </p>
-          <p className="mt-2 font-tech text-7xl leading-none tracking-[-0.09em] text-[#E7F7DE]">
-            {zone.risk}
-            <span className="ml-2 font-mono text-lg tracking-normal">/ 10</span>
-          </p>
-          <div className="mt-5 flex flex-wrap gap-3 lg:justify-end">
-            <span className="border border-[#8BC97D]/60 px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em] text-[#A9DB9D]">
-              Confidence high
+    <div className="absolute inset-0 grid grid-cols-5 grid-rows-5">
+      {zones.map(zone => {
+        const tone = styles[zone.classification];
+        return (
+          <button
+            key={zone.id}
+            onClick={() => onSelect(zone.id)}
+            className="relative flex min-h-0 flex-col justify-between border border-white/30 p-1 text-left sm:p-2"
+            style={{
+              background: tone.bg,
+              color: tone.text,
+              boxShadow:
+                zone.id === selected
+                  ? `inset 0 0 0 2px ${tone.ring}`
+                  : undefined,
+            }}
+          >
+            <span className="font-mono text-[8px] uppercase tracking-[.1em] sm:text-[10px]">
+              {zone.id}
             </span>
-            <Button
-              onClick={onInspect}
-              variant="outline"
-              className="h-9 rounded-none border-white/30 bg-transparent font-mono text-[9px] uppercase tracking-[0.13em] text-white hover:bg-white hover:text-black"
-            >
-              Inspect evidence <ArrowRight className="ml-2 size-3.5" />
-            </Button>
-          </div>
-        </div>
-      </div>
-    </section>
+            <span className="self-end font-mono text-sm sm:text-lg">
+              {zone.risk}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function LandingReticle({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+      <circle
+        cx="32"
+        cy="32"
+        r="17"
+        fill="rgba(0,0,0,.25)"
+        stroke="currentColor"
+        strokeWidth="1.3"
+      />
+      <circle
+        cx="32"
+        cy="32"
+        r="6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="M32 2v17M32 45v17M2 32h17M45 32h17"
+        stroke="currentColor"
+        strokeWidth="1"
+        opacity=".78"
+      />
+      <path d="M29 29h6v6h-6z" fill="currentColor" />
+    </svg>
   );
 }
