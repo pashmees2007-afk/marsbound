@@ -3,6 +3,7 @@
  * outputs, and matched AI4Mars semantic labels are the product.
  */
 import { Button } from "@/components/ui/button";
+import { trpc } from "@/lib/trpc";
 import {
   ArrowDownToLine,
   Check,
@@ -22,7 +23,7 @@ import type { ChangeEvent, MouseEvent } from "react";
 import { toast } from "sonner";
 
 type Stage = "mission" | "processing" | "results" | "awaiting-api";
-type View = "raw" | "hazards" | "risk" | "zones";
+type View = "raw" | "hazards" | "risk" | "zones" | "prediction";
 type LabelView = "source" | "overlay" | "mask";
 type Zone = {
   id: string;
@@ -32,6 +33,18 @@ type Zone = {
   edgeDensity: number;
   circlePressure: number;
   classification: "PREFERRED" | "REVIEW" | "AVOID";
+};
+
+type BackendSegmentationResult = {
+  analysisId: string;
+  model: { version: string; label: string; trainingPairs: number };
+  sourceUrl: string;
+  predictionUrl: string;
+  overlayUrl: string;
+  width: number;
+  height: number;
+  classCounts: Array<{ classId: number; className: string; pixels: number; share: number }>;
+  disclaimer: string;
 };
 
 const assets = {
@@ -53,7 +66,25 @@ const assets = {
   msl03Overlay: "/manus-storage/ai4mars_msl_03_overlay_343d7402.jpg",
   msl03Mask: "/manus-storage/ai4mars_msl_03_semantic_mask_dc56edb1.png",
   msl03RawMask: "/manus-storage/ai4mars_msl_03_raw_mask_3566c096.png",
+  prediction01: "/manus-storage/ai4mars_msl_01_prediction_mask_75f220e3.png",
+  prediction01Overlay: "/manus-storage/ai4mars_msl_01_prediction_overlay_e95107b3.jpg",
+  groundTruth01: "/manus-storage/ai4mars_msl_01_prediction_ground_truth_cff75e56.png",
+  disagreement01: "/manus-storage/ai4mars_msl_01_prediction_disagreement_db2de359.png",
+  prediction02: "/manus-storage/ai4mars_msl_02_prediction_mask_2f5e3092.png",
+  prediction02Overlay: "/manus-storage/ai4mars_msl_02_prediction_overlay_28f3de6b.jpg",
+  groundTruth02: "/manus-storage/ai4mars_msl_02_prediction_ground_truth_232f3c17.png",
+  disagreement02: "/manus-storage/ai4mars_msl_02_prediction_disagreement_19b1c044.png",
+  prediction03: "/manus-storage/ai4mars_msl_03_prediction_mask_f06dcc93.png",
+  prediction03Overlay: "/manus-storage/ai4mars_msl_03_prediction_overlay_ba842624.jpg",
+  groundTruth03: "/manus-storage/ai4mars_msl_03_prediction_ground_truth_b74d87e7.png",
+  disagreement03: "/manus-storage/ai4mars_msl_03_prediction_disagreement_ba722388.png",
 };
+
+const modelComparisons = [
+  { id: "MSL-01", source: assets.msl01Source, prediction: assets.prediction01, overlay: assets.prediction01Overlay, groundTruth: assets.groundTruth01, disagreement: assets.disagreement01, accuracy: "47.81%", macroF1: "22.95%", note: "Bedrock-dominant test plate" },
+  { id: "MSL-02", source: assets.msl02Source, prediction: assets.prediction02, overlay: assets.prediction02Overlay, groundTruth: assets.groundTruth02, disagreement: assets.disagreement02, accuracy: "45.98%", macroF1: "21.98%", note: "Bedrock and big-rock test plate" },
+  { id: "MSL-03", source: assets.msl03Source, prediction: assets.prediction03, overlay: assets.prediction03Overlay, groundTruth: assets.groundTruth03, disagreement: assets.disagreement03, accuracy: "4.19%", macroF1: "2.14%", note: "Failure case: soil and sand scene" },
+];
 
 const terrainClasses: Record<number, { name: string; color: string; detail: string }> = {
   0: { name: "Soil", color: "#B78554", detail: "Navigation terrain class" },
@@ -168,6 +199,8 @@ export default function Home() {
   const [complete, setComplete] = useState(0);
   const [upload, setUpload] = useState<string | null>(null);
   const [uploadName, setUploadName] = useState("");
+  const [uploadDataUrl, setUploadDataUrl] = useState<string | null>(null);
+  const [backendResult, setBackendResult] = useState<BackendSegmentationResult | null>(null);
   const [selectedId, setSelectedId] = useState("E5");
   const [evidenceLayer, setEvidenceLayer] = useState("RAW TERRAIN");
   const [labelSampleId, setLabelSampleId] = useState("MSL-01");
@@ -177,6 +210,22 @@ export default function Home() {
     y: number;
     value: number;
   } | null>(null);
+  const [comparisonId, setComparisonId] = useState("MSL-01");
+  const [comparisonView, setComparisonView] = useState<"source" | "prediction" | "groundTruth" | "disagreement">("prediction");
+  const analyzeMutation = trpc.segmentation.analyze.useMutation({
+    onSuccess: result => {
+      setBackendResult(result);
+      setStage("results");
+      setView("prediction");
+      setProgress(100);
+      setComplete(6);
+      toast.success("Server segmentation complete", { description: `Saved analysis ${result.analysisId.slice(0, 8)} uses ${result.model.label}.` });
+    },
+    onError: error => {
+      setStage("mission");
+      toast.error("Segmentation request failed", { description: error.message });
+    },
+  });
 
   const selected = useMemo(
     () => zones.find(zone => zone.id === selectedId) ?? zones[24],
@@ -191,11 +240,16 @@ export default function Home() {
   );
   const sourceName = upload ? uploadName : "curiosity_image_01.png";
   const primaryImage =
-    upload ?? (view === "hazards" ? assets.hazards : assets.raw);
+    view === "prediction" && backendResult
+      ? backendResult.predictionUrl
+      : view === "hazards" && backendResult
+        ? backendResult.overlayUrl
+        : upload ?? (view === "hazards" ? assets.hazards : assets.raw);
   const isVerified = !upload;
   const selectedLabeledTerrain =
     labeledTerrainSamples.find(sample => sample.id === labelSampleId) ??
     labeledTerrainSamples[0];
+  const selectedComparison = modelComparisons.find(sample => sample.id === comparisonId) ?? modelComparisons[0];
 
   const scroll = (id: string) =>
     document
@@ -204,19 +258,14 @@ export default function Home() {
 
   const runAnalysis = (forceSample = false) => {
     if (upload && !forceSample) {
+      if (!uploadDataUrl) {
+        toast.error("Terrain file is still loading");
+        return;
+      }
       setStage("processing");
-      setProgress(0);
-      setComplete(0);
-      [22, 47, 74, 100].forEach((value, index) =>
-        window.setTimeout(
-          () => {
-            setProgress(value);
-            setComplete(index + 1);
-          },
-          (index + 1) * 420
-        )
-      );
-      window.setTimeout(() => setStage("awaiting-api"), 1780);
+      setProgress(18);
+      setComplete(2);
+      analyzeMutation.mutate({ filename: uploadName || "terrain.png", dataUrl: uploadDataUrl });
       return;
     }
     setStage("processing");
@@ -256,22 +305,28 @@ export default function Home() {
       toast.error("Image file required");
       return;
     }
-    setUpload(URL.createObjectURL(file));
-    setUploadName(file.name);
-    setStage("mission");
-    setView("raw");
-    setProgress(0);
-    setComplete(0);
-    toast.success("Terrain image selected", {
-      description:
-        "The image is staged for a future server-side OpenCV analysis pass.",
-    });
+    const reader = new FileReader();
+    reader.onload = () => {
+      setUpload(URL.createObjectURL(file));
+      setUploadName(file.name);
+      setUploadDataUrl(String(reader.result));
+      setBackendResult(null);
+      setStage("mission");
+      setView("raw");
+      setProgress(0);
+      setComplete(0);
+      toast.success("Terrain image selected", { description: "Ready for the server-side segmentation baseline." });
+    };
+    reader.onerror = () => toast.error("Unable to read this terrain image");
+    reader.readAsDataURL(file);
   };
 
   const reset = () => {
     setStage("mission");
     setUpload(null);
     setUploadName("");
+    setUploadDataUrl(null);
+    setBackendResult(null);
     setProgress(0);
     setComplete(0);
     setView("raw");
@@ -617,7 +672,7 @@ export default function Home() {
                   )}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-px border border-white/15 bg-white/15">
-                  {(["raw", "hazards", "risk", "zones"] as View[]).map(item => (
+                  {(["raw", "hazards", ...(backendResult ? ["prediction"] : []), "risk", "zones"] as View[]).map(item => (
                     <button
                       key={item}
                       onClick={() => setView(item)}
@@ -627,6 +682,8 @@ export default function Home() {
                         ? "Raw"
                         : item === "hazards"
                           ? "Hazards"
+                          : item === "prediction"
+                            ? "Server prediction"
                           : item === "risk"
                             ? "Risk Map"
                             : "Landing Zones"}
@@ -829,6 +886,28 @@ export default function Home() {
                 </aside>
               </div>
               <div className="mt-6 grid gap-px border border-white/15 bg-white/15 md:grid-cols-3">{labeledTerrainSamples.map(sample => <button key={sample.id} onClick={() => { setLabelSampleId(sample.id); setLabelView("overlay"); setPixelReading(null); }} className={`flex gap-4 bg-[#090909] p-4 text-left ${sample.id === selectedLabeledTerrain.id ? "bg-[#151515]" : "hover:bg-[#111]"}`}><img src={sample.overlay} alt="" className="size-16 shrink-0 border border-white/10 object-cover" /><span><span className="block font-mono text-[9px] uppercase tracking-[.13em] text-white">{sample.id}</span><span className="mt-2 block text-xs leading-5 text-white/50">{sample.coverage} labeled area · {sample.classes.map(value => terrainClasses[value].name).join(" / ")}</span></span></button>)}</div>
+            </div>
+          </section>
+
+          <section id="comparison" className="border-b border-white/12 bg-[#070707]">
+            <div className="mx-auto max-w-[1500px] px-5 py-14 sm:px-8 lg:px-10">
+              <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[.19em] text-[#E26D61]">05 / Baseline validation</p>
+                  <h2 className="mt-3 font-tech text-3xl tracking-[-.05em] text-white sm:text-4xl">Prediction against ground truth.</h2>
+                </div>
+                <p className="max-w-md text-sm leading-6 text-white/55">The baseline is evaluated against the matching merged AI4Mars mask. Red pixels in the disagreement view mark labelled ground-truth pixels whose predicted class differs.</p>
+              </div>
+              <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]">
+                <article className="border border-white/15 bg-[#090909] p-3 sm:p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3"><div><p className="font-mono text-[9px] uppercase tracking-[.15em] text-white/45">Model review plate</p><p className="mt-1 font-mono text-[10px] uppercase tracking-[.11em] text-white/80">{selectedComparison.id} / nearest-prototype baseline</p></div><span className="font-mono text-[9px] uppercase tracking-[.13em] text-[#F0C56B]">Validation view</span></div>
+                  <img src={comparisonView === "source" ? selectedComparison.source : comparisonView === "prediction" ? selectedComparison.prediction : comparisonView === "groundTruth" ? selectedComparison.groundTruth : selectedComparison.disagreement} alt={`${comparisonView} for ${selectedComparison.id}`} className="mt-3 aspect-square w-full border border-white/10 object-cover" />
+                  <div className="mt-3 flex flex-wrap gap-px border border-white/15 bg-white/15">{(["source", "prediction", "groundTruth", "disagreement"] as const).map(item => <button key={item} onClick={() => setComparisonView(item)} className={`px-3 py-2 font-mono text-[9px] uppercase tracking-[.12em] ${comparisonView === item ? "bg-white text-black" : "bg-[#0A0A0A] text-white/55 hover:text-white"}`}>{item === "groundTruth" ? "Ground truth" : item}</button>)}</div>
+                </article>
+                <aside className="border border-white/15 bg-[#090909]"><div className="border-b border-white/10 p-5"><p className="font-mono text-[10px] uppercase tracking-[.16em] text-[#E26D61]">Measured comparison</p><p className="mt-3 font-tech text-3xl tracking-[-.05em] text-white">{selectedComparison.id}</p><p className="mt-2 text-sm text-white/55">{selectedComparison.note}</p></div><dl className="divide-y divide-white/10"><Stat label="Pixel accuracy" value={selectedComparison.accuracy} note="labelled pixels only" /><Stat label="Macro F1" value={selectedComparison.macroF1} note="unweighted class average" /><Stat label="Training source" value="49" note="matched MSL image-mask pairs" /></dl><div className="border-t border-[#F0C56B]/30 bg-[#15120D] p-5"><p className="font-mono text-[9px] uppercase tracking-[.14em] text-[#F0C56B]">Model limitation</p><p className="mt-2 text-sm leading-6 text-white/60">This intensity-and-gradient prototype is intentionally simple. The MSL-03 failure case demonstrates why a trained semantic network and held-out test split are needed before operational use.</p></div></aside>
+              </div>
+              <div className="mt-6 grid gap-px border border-white/15 bg-white/15 md:grid-cols-3">{modelComparisons.map(sample => <button key={sample.id} onClick={() => { setComparisonId(sample.id); setComparisonView("prediction"); }} className={`flex items-center justify-between bg-[#090909] px-4 py-4 text-left ${sample.id === selectedComparison.id ? "bg-[#151515]" : "hover:bg-[#111]"}`}><span><span className="block font-mono text-[9px] uppercase tracking-[.13em] text-white">{sample.id}</span><span className="mt-1 block font-mono text-[9px] uppercase tracking-[.1em] text-white/45">Acc {sample.accuracy} / F1 {sample.macroF1}</span></span><ChevronRight className="size-4 text-[#E26D61]" /></button>)}</div>
+              {backendResult && <div className="mt-6 border-l-2 border-[#69AB63] bg-[#0C120C] px-5 py-4"><p className="font-mono text-[10px] uppercase tracking-[.15em] text-[#A9DB9D]">Latest uploaded-image result</p><p className="mt-2 text-sm leading-6 text-white/65">Saved analysis <span className="font-mono text-white">{backendResult.analysisId}</span> produced a {backendResult.width} × {backendResult.height} prediction. Ground truth is unavailable for arbitrary uploads; comparison metrics are only shown for matched AI4Mars samples.</p></div>}
             </div>
           </section>
 

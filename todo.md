@@ -30,3 +30,18 @@
 - [x] Add a source/overlay/mask evidence viewer with terrain-class legend and pixel-level inspection.
 - [x] Integrate the viewer into MARSBOUND’s evidence workflow without obscuring the existing OpenCV results.
 - [x] Verify the viewer’s desktop and mobile controls, then save a project checkpoint.
+
+## Segmentation Backend and Ground-Truth Comparison
+
+- [x] Define the upload, inference, and prediction-versus-ground-truth result contract with clear model provenance.
+- [x] Upgrade MARSBOUND for server-side uploads, API routes, and persistent analysis records.
+- [x] Implement segmentation inference with a disclosed baseline method for arbitrary terrain uploads.
+- [x] Compute class-level comparison metrics and confusion information for matched AI4Mars examples.
+- [x] Add a prediction-versus-ground-truth interface with source, prediction, ground truth, and disagreement modes.
+- [x] Validate the upload and comparison flows across desktop and mobile, then save a project checkpoint.
+- [x] Verify the actual desktop UI upload-to-server-prediction path and persisted analysis result.
+- [x] Verify mobile comparison controls and the updated upload workflow on the full-stack build.
+- [x] Save the validated full-stack segmentation and comparison update as a project checkpoint.
+- [x] Verify the actual mobile upload-to-server-prediction path on the full-stack build.
+- [x] Save the verified full-stack segmentation and comparison update as a project checkpoint.
+- [x] Save a final project checkpoint containing the verified backend, comparison interface, and responsive upload-flow validations.
