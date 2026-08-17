@@ -77,3 +77,7 @@ The MARSBOUND mark is a **minimal descent arc crossing a centered landing reticl
 - The entry screen is a restrained mission briefing, not a marketing hero: reduce headline scale, remove decorative recommendation teasers, and route the visitor directly to terrain acquisition.
 - The terrain plate is the primary interface surface. Derived evidence must appear as contiguous viewing modes—raw terrain, edges, circular features, combined hazards, and risk grid—rather than as detached promotional cards.
 - Mission decision language is compact and specific. Favor tables, coordinate labels, hazard counts, and inspectable reasons over floating badges, glass effects, or ornamental UI.
+- The first viewport must expose the current landing recommendation, risk score, and primary rationale as the active mission outcome; it must not wait for the lower decision section.
+- Descent Red `#E13C2E` remains the sole brand accent. Green is reserved for confirmed safe or recommended states, amber for caution, and intermediate detector layers use restrained instrument tones unless they directly encode risk.
+- Every section must reinforce one descent sequence: acquisition → processing → evidence → label inspection → ranked decision. Repeat short mission-state language and the reticle/grid motif to connect these stages.
+- The recommendation panel is the official mission output. It should visually carry the descent reticle and retain enough contrast to feel like the final commit-or-review artifact.

@@ -1,6 +1,6 @@
 /**
- * MARSBOUND evidence-first interface: terrain imagery and verified computer-vision
- * outputs are the product. The UI uses restrained mission-software hierarchy.
+ * MARSBOUND evidence-first interface: terrain imagery, verified computer-vision
+ * outputs, and matched AI4Mars semantic labels are the product.
  */
 import { Button } from "@/components/ui/button";
 import {
@@ -18,11 +18,12 @@ import {
   Upload,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, MouseEvent } from "react";
 import { toast } from "sonner";
 
 type Stage = "mission" | "processing" | "results" | "awaiting-api";
 type View = "raw" | "hazards" | "risk" | "zones";
+type LabelView = "source" | "overlay" | "mask";
 type Zone = {
   id: string;
   row: number;
@@ -40,7 +41,63 @@ const assets = {
   circles: "/manus-storage/curiosity_image_01_circle_candidates_59a3ddec.png",
   hazards: "/manus-storage/curiosity_image_01_annotated_71856f00.png",
   mark: "/manus-storage/marsbound-mark_17b62cf7.png",
+  msl01Source: "/manus-storage/ai4mars_msl_01_source_37badad5.jpg",
+  msl01Overlay: "/manus-storage/ai4mars_msl_01_overlay_0b129343.jpg",
+  msl01Mask: "/manus-storage/ai4mars_msl_01_semantic_mask_797dac14.png",
+  msl01RawMask: "/manus-storage/ai4mars_msl_01_raw_mask_c330fc6a.png",
+  msl02Source: "/manus-storage/ai4mars_msl_02_source_655c88ac.jpg",
+  msl02Overlay: "/manus-storage/ai4mars_msl_02_overlay_b2b98987.jpg",
+  msl02Mask: "/manus-storage/ai4mars_msl_02_semantic_mask_0e2379ae.png",
+  msl02RawMask: "/manus-storage/ai4mars_msl_02_raw_mask_e59547c0.png",
+  msl03Source: "/manus-storage/ai4mars_msl_03_source_73f8e71e.jpg",
+  msl03Overlay: "/manus-storage/ai4mars_msl_03_overlay_343d7402.jpg",
+  msl03Mask: "/manus-storage/ai4mars_msl_03_semantic_mask_dc56edb1.png",
+  msl03RawMask: "/manus-storage/ai4mars_msl_03_raw_mask_3566c096.png",
 };
+
+const terrainClasses: Record<number, { name: string; color: string; detail: string }> = {
+  0: { name: "Soil", color: "#B78554", detail: "Navigation terrain class" },
+  1: { name: "Bedrock", color: "#688CB4", detail: "Navigation terrain class" },
+  2: { name: "Sand", color: "#DDBA4D", detail: "Navigation terrain class" },
+  3: { name: "Big rock", color: "#D95241", detail: "Navigation terrain class" },
+  255: { name: "No label", color: "#525252", detail: "Outside confident annotated area" },
+};
+
+const labeledTerrainSamples = [
+  {
+    id: "MSL-01",
+    imageId: "NLA_601599700EDR_F0731944NCAM00258M1",
+    source: assets.msl01Source,
+    overlay: assets.msl01Overlay,
+    mask: assets.msl01Mask,
+    rawMask: assets.msl01RawMask,
+    coverage: "28.98%",
+    classes: [0, 1, 2],
+    counts: { 0: 51768, 1: 241692, 2: 10367, 3: 0, 255: 744749 },
+  },
+  {
+    id: "MSL-02",
+    imageId: "NLB_436560661EDR_F0220000NCAM00354M1",
+    source: assets.msl02Source,
+    overlay: assets.msl02Overlay,
+    mask: assets.msl02Mask,
+    rawMask: assets.msl02RawMask,
+    coverage: "78.03%",
+    classes: [1, 3],
+    counts: { 0: 0, 1: 796917, 2: 0, 3: 21337, 255: 230322 },
+  },
+  {
+    id: "MSL-03",
+    imageId: "NLB_458661027EDR_F0390516NCAM00354M1",
+    source: assets.msl03Source,
+    overlay: assets.msl03Overlay,
+    mask: assets.msl03Mask,
+    rawMask: assets.msl03RawMask,
+    coverage: "81.46%",
+    classes: [0, 2],
+    counts: { 0: 852740, 1: 0, 2: 1417, 3: 0, 255: 194419 },
+  },
+];
 
 const zones: Zone[] = [
   ["A1", 0, 0, 4, 0.0372, 2.0353, "REVIEW"],
@@ -113,6 +170,13 @@ export default function Home() {
   const [uploadName, setUploadName] = useState("");
   const [selectedId, setSelectedId] = useState("E5");
   const [evidenceLayer, setEvidenceLayer] = useState("RAW TERRAIN");
+  const [labelSampleId, setLabelSampleId] = useState("MSL-01");
+  const [labelView, setLabelView] = useState<LabelView>("overlay");
+  const [pixelReading, setPixelReading] = useState<{
+    x: number;
+    y: number;
+    value: number;
+  } | null>(null);
 
   const selected = useMemo(
     () => zones.find(zone => zone.id === selectedId) ?? zones[24],
@@ -129,6 +193,9 @@ export default function Home() {
   const primaryImage =
     upload ?? (view === "hazards" ? assets.hazards : assets.raw);
   const isVerified = !upload;
+  const selectedLabeledTerrain =
+    labeledTerrainSamples.find(sample => sample.id === labelSampleId) ??
+    labeledTerrainSamples[0];
 
   const scroll = (id: string) =>
     document
@@ -210,6 +277,32 @@ export default function Home() {
     setView("raw");
     setSelectedId("E5");
     scroll("#mission");
+  };
+
+  const inspectLabelPixel = (event: MouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = Math.max(
+      0,
+      Math.min(1023, Math.floor(((event.clientX - rect.left) / rect.width) * 1024))
+    );
+    const y = Math.max(
+      0,
+      Math.min(1023, Math.floor(((event.clientY - rect.top) / rect.height) * 1024))
+    );
+    const mask = new Image();
+    mask.crossOrigin = "anonymous";
+    mask.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1024;
+      canvas.height = 1024;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) return;
+      context.drawImage(mask, 0, 0, 1024, 1024);
+      const value = context.getImageData(x, y, 1, 1).data[0];
+      setPixelReading({ x, y, value });
+    };
+    mask.onerror = () => toast.error("Unable to read this semantic mask");
+    mask.src = selectedLabeledTerrain.rawMask;
   };
 
   const exportReport = () => {
@@ -307,6 +400,9 @@ export default function Home() {
             <a href="#evidence" className="hover:text-white">
               Evidence
             </a>
+            <a href="#labels" className="hover:text-white">
+              Labels
+            </a>
             <a href="#report" className="hover:text-white">
               Report
             </a>
@@ -325,19 +421,29 @@ export default function Home() {
         <div className="mx-auto grid max-w-[1500px] gap-10 px-5 py-14 sm:px-8 lg:grid-cols-[.72fr_1.28fr] lg:px-10 lg:py-16">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[.19em] text-[#E26D61]">
-              Mission / 01
+              Descent brief / 01
             </p>
             <h1 className="mt-4 font-tech text-4xl tracking-[-.055em] text-white sm:text-5xl">
-              Landing Site Analysis
+              Terrain loaded. Descent assessment ready.
             </h1>
             <p className="mt-5 max-w-md text-sm leading-6 text-white/60">
-              Evaluate Martian terrain for potential landing zones using
-              computer vision and transparent terrain-risk analysis.
+              The verified terrain pass has resolved a preferred approach area.
+              Inspect the computer-vision evidence before committing descent.
             </p>
             <div className="mt-8 border-t border-white/12 pt-5 font-mono text-[9px] uppercase tracking-[.14em] text-white/45">
               <p>Target / Mars</p>
               <p className="mt-2">Model / OpenCV classical vision</p>
               <p className="mt-2">Grid / 5 × 5 candidate zones</p>
+            </div>
+            <div className="mt-7 border-l-2 border-[#E13C2E] bg-[#100B09] px-4 py-4">
+              <p className="font-mono text-[9px] uppercase tracking-[.15em] text-[#E26D61]">
+                Current mission outcome
+              </p>
+              <div className="mt-2 flex items-end gap-3">
+                <p className="font-tech text-4xl tracking-[-.07em] text-white">E5</p>
+                <p className="pb-1 font-mono text-[10px] uppercase tracking-[.13em] text-[#A9DB9D]">Risk 2.0 / 10</p>
+              </div>
+              <p className="mt-2 text-sm leading-5 text-white/60">Recommended: no circular-feature intersection and low nearby edge response in the verified grid.</p>
             </div>
           </div>
           <div className="border border-white/15 bg-[#0B0B0B] p-4 sm:p-5">
@@ -358,9 +464,9 @@ export default function Home() {
             </div>
             {isVerified && (
               <div className="flex items-center justify-between border-b border-[#69AB63]/35 bg-[#0C120C] px-3 py-2 font-mono text-[9px] uppercase tracking-[.13em]">
-                <span className="text-white/55">Saved mission result</span>
+                <span className="text-white/55">Mission outcome / E5</span>
                 <span className="text-[#A9DB9D]">
-                  E5 / risk 2.0 / recommended
+                  Risk 2.0 / 10 / recommended
                 </span>
               </div>
             )}
@@ -404,6 +510,23 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        <div className="mx-auto max-w-[1500px] px-5 pb-8 sm:px-8 lg:px-10">
+          <div className="grid border border-white/12 bg-[#090909] sm:grid-cols-5">
+            {[
+              ["01", "Acquire", "terrain loaded"],
+              ["02", "Process", "vision pass"],
+              ["03", "Evidence", "inspect signals"],
+              ["04", "Labels", "review terrain classes"],
+              ["05", "Decide", "E5 recommended"],
+            ].map(([number, title, state], index) => (
+              <div key={title} className={`flex items-center gap-3 border-b border-white/10 px-4 py-3 sm:border-b-0 sm:border-r ${index === 4 ? "border-r-0 bg-[#0C120C]" : ""}`}>
+                <span className={`font-mono text-[9px] ${index === 4 ? "text-[#E26D61]" : "text-white/35"}`}>{number}</span>
+                <span><span className="block font-mono text-[9px] uppercase tracking-[.13em] text-white/75">{title}</span><span className="mt-1 block font-mono text-[8px] uppercase tracking-[.1em] text-white/40">{state}</span></span>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       <section id="analysis" className="border-b border-white/12 bg-[#090909]">
@@ -411,7 +534,7 @@ export default function Home() {
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[.19em] text-[#E26D61]">
-                Analysis / primary workspace
+                02 / Computer vision review
               </p>
               <h2 className="mt-3 font-tech text-3xl tracking-[-.05em] text-white sm:text-4xl">
                 Verified descent review
@@ -568,7 +691,7 @@ export default function Home() {
               <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-[.19em] text-[#E26D61]">
-                    Evidence / intermediate outputs
+                    03 / Detector evidence
                   </p>
                   <h2 className="mt-3 font-tech text-3xl tracking-[-.05em] text-white sm:text-4xl">
                     Inspect the algorithm, not just the answer.
@@ -667,11 +790,53 @@ export default function Home() {
             </div>
           </section>
 
+          <section id="labels" className="border-b border-white/12 bg-[#0A0A0A]">
+            <div className="mx-auto max-w-[1500px] px-5 py-14 sm:px-8 lg:px-10">
+              <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[.19em] text-[#E26D61]">
+                    04 / Label evidence / matched MSL pairs
+                  </p>
+                  <h2 className="mt-3 font-tech text-3xl tracking-[-.05em] text-white sm:text-4xl">
+                    Terrain classes, inspected directly.
+                  </h2>
+                </div>
+                <p className="max-w-md text-sm leading-6 text-white/55">
+                  These are directly matched MSL Navcam source images and merged AI4Mars semantic masks. Colors denote annotation classes—not detector predictions.
+                </p>
+              </div>
+              <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]">
+                <article className="border border-white/15 bg-[#090909] p-3 sm:p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+                    <div>
+                      <p className="font-mono text-[9px] uppercase tracking-[.15em] text-white/45">Semantic terrain plate</p>
+                      <p className="mt-1 font-mono text-[10px] uppercase tracking-[.11em] text-white/80">{selectedLabeledTerrain.imageId} / 1024 × 1024 PX</p>
+                    </div>
+                    <span className="font-mono text-[9px] uppercase tracking-[.13em] text-[#9BD392]">Merged label / {selectedLabeledTerrain.coverage} coverage</span>
+                  </div>
+                  <button onClick={inspectLabelPixel} className="relative mt-3 block w-full overflow-hidden border border-white/10 bg-black text-left focus:outline-none focus:ring-1 focus:ring-[#E26D61]" aria-label="Inspect label class at this terrain position">
+                    <img src={labelView === "source" ? selectedLabeledTerrain.source : labelView === "overlay" ? selectedLabeledTerrain.overlay : selectedLabeledTerrain.mask} alt={`${labelView} view of matched MSL terrain sample`} className="aspect-square w-full object-cover" />
+                    <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between bg-black/80 px-3 py-2 font-mono text-[9px] uppercase tracking-[.13em] text-white/75"><span>Click terrain to inspect label</span><span>{labelView === "source" ? "Source image" : labelView === "overlay" ? "Semantic overlay" : "Class mask"}</span></div>
+                  </button>
+                  <div className="mt-3 flex flex-wrap gap-px border border-white/15 bg-white/15">
+                    {(["source", "overlay", "mask"] as LabelView[]).map(item => <button key={item} onClick={() => setLabelView(item)} className={`px-4 py-2 font-mono text-[9px] uppercase tracking-[.13em] ${labelView === item ? "bg-white text-black" : "bg-[#0A0A0A] text-white/55 hover:text-white"}`}>{item === "source" ? "Source" : item === "overlay" ? "Overlay" : "Class mask"}</button>)}
+                  </div>
+                </article>
+                <aside className="border border-white/15 bg-[#090909]">
+                  <div className="border-b border-white/10 p-5"><p className="font-mono text-[10px] uppercase tracking-[.16em] text-[#E26D61]">Pixel inspection</p><p className="mt-3 font-tech text-2xl tracking-[-.04em] text-white">{pixelReading ? terrainClasses[pixelReading.value]?.name ?? "Unknown" : "Select a point"}</p><p className="mt-2 font-mono text-[9px] uppercase tracking-[.12em] text-white/45">{pixelReading ? `X ${pixelReading.x} / Y ${pixelReading.y} / VALUE ${pixelReading.value}` : "Read exact mask value from 1024 × 1024 label"}</p></div>
+                  <div className="divide-y divide-white/10">{[0, 1, 2, 3, 255].map(value => <div key={value} className="flex items-center justify-between gap-3 px-5 py-3"><span className="flex items-center gap-3 font-mono text-[9px] uppercase tracking-[.12em] text-white/70"><span className="size-3 border border-white/20" style={{ backgroundColor: terrainClasses[value].color }} />{terrainClasses[value].name}</span><span className="font-mono text-[9px] text-white/40">{selectedLabeledTerrain.counts[value as keyof typeof selectedLabeledTerrain.counts].toLocaleString()} PX</span></div>)}</div>
+                  <div className="p-5 text-sm leading-6 text-white/55">The current sample includes {selectedLabeledTerrain.classes.map(value => terrainClasses[value].name.toLowerCase()).join(", ")}. Unlabeled pixels are intentionally excluded from terrain-class claims.</div>
+                </aside>
+              </div>
+              <div className="mt-6 grid gap-px border border-white/15 bg-white/15 md:grid-cols-3">{labeledTerrainSamples.map(sample => <button key={sample.id} onClick={() => { setLabelSampleId(sample.id); setLabelView("overlay"); setPixelReading(null); }} className={`flex gap-4 bg-[#090909] p-4 text-left ${sample.id === selectedLabeledTerrain.id ? "bg-[#151515]" : "hover:bg-[#111]"}`}><img src={sample.overlay} alt="" className="size-16 shrink-0 border border-white/10 object-cover" /><span><span className="block font-mono text-[9px] uppercase tracking-[.13em] text-white">{sample.id}</span><span className="mt-2 block text-xs leading-5 text-white/50">{sample.coverage} labeled area · {sample.classes.map(value => terrainClasses[value].name).join(" / ")}</span></span></button>)}</div>
+            </div>
+          </section>
+
           <section id="report" className="bg-[#090909]">
             <div className="mx-auto grid max-w-[1500px] gap-8 px-5 py-14 sm:px-8 lg:grid-cols-[1.1fr_.9fr] lg:px-10">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-[.19em] text-[#E26D61]">
-                  Decision / landing zone ranking
+                  05 / Decision / landing zone ranking
                 </p>
                 <h2 className="mt-3 font-tech text-3xl tracking-[-.05em] text-white sm:text-4xl">
                   Candidate zone assessment
@@ -719,11 +884,13 @@ export default function Home() {
                   </table>
                 </div>
               </div>
-              <aside className="border border-[#69AB63]/55 bg-[#0D130D] p-6">
+              <aside className="relative overflow-hidden border border-[#E13C2E]/70 bg-[#0D130D] p-6">
+                <div className="absolute inset-x-0 top-0 h-1 bg-[#E13C2E]" />
+                <LandingReticle className="absolute right-5 top-5 size-16 text-[#E13C2E]/70" />
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="font-mono text-[10px] uppercase tracking-[.17em] text-[#A9DB9D]">
-                      Landing site recommended
+                      Official mission output
                     </p>
                     <h3 className="mt-5 font-tech text-7xl leading-none tracking-[-.09em] text-white">
                       {selected.id}
