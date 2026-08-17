@@ -63,3 +63,18 @@
  - [x] Compare held-out macro F1 and per-class rare-hazard F1 against the original U-Net and server baseline.
  - [x] Promote a model only if it improves the held-out rare-hazard criteria; otherwise retain the current disclosed baseline.
  - [x] Document the experiment and update MARSBOUND only for a validated improvement.
+
+## Expanded AI4Mars MSL Training
+
+- [x] Retrieve an expanded, directly matched MSL image-and-label corpus from the official AI4Mars archive without adding large assets to the web project.
+- [x] Audit class presence per image and build image-level stratified train, validation, and held-out test splits that include sand and big-rock evidence.
+- [x] Train a segmentation candidate on the expanded corpus with rare-hazard-aware sampling and reproducible evaluation artifacts.
+- [x] Compare the expanded-data candidate with the current server baseline using held-out macro F1 and per-class terrain F1.
+- [x] Integrate a candidate into MARSBOUND only if it outperforms the active baseline under the fixed held-out evaluation.
+- [x] Run tests and validate the upload-to-prediction web flow after any model integration, then document the outcome.
+
+## Recovered Expanded-Corpus Training Run
+
+- [x] Inventory the 118 matched MSL pairs recovered from the interrupted official selective download and retain their per-image provenance.
+- [x] Build stratified image-level splits from the recovered corpus with rare terrain classes represented in both validation and test sets where available.
+- [x] Train and evaluate an expanded-data candidate, then retain or promote it strictly by held-out macro F1 and per-class F1.

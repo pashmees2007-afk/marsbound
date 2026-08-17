@@ -27,6 +27,15 @@ export async function runSegmentation(dataUrl: string, filename: string): Promis
   const { data, mimeType } = parseDataUrl(dataUrl);
   const normalized = await sharp(data).rotate().resize(TARGET_SIZE, TARGET_SIZE, { fit: "cover" }).png().toBuffer();
   const { data: gray, info } = await sharp(normalized).grayscale().raw().toBuffer({ resolveWithObject: true });
+  const squared = Buffer.alloc(gray.length);
+  for (let index = 0; index < gray.length; index += 1) {
+    const normalizedValue = gray[index] / 255;
+    squared[index] = Math.round(normalizedValue * normalizedValue * 255);
+  }
+  const [blurred, blurredSquared] = await Promise.all([
+    sharp(gray, { raw: { width: info.width, height: info.height, channels: 1 } }).blur(2).raw().toBuffer(),
+    sharp(squared, { raw: { width: info.width, height: info.height, channels: 1 } }).blur(2).raw().toBuffer(),
+  ]);
   const prediction = new Uint8Array(info.width * info.height);
   const rgb = Buffer.alloc(info.width * info.height * 3);
   const counts = [0, 0, 0, 0];
@@ -39,7 +48,15 @@ export async function runSegmentation(dataUrl: string, filename: string): Promis
       const top = gray[Math.max(0, y - 1) * info.width + x] / 255;
       const bottom = gray[Math.min(info.height - 1, y + 1) * info.width + x] / 255;
       const gradient = Math.min(1, Math.hypot(right - left, bottom - top));
-      const classId = classifyFeature(center, gradient);
+      const localMean = blurred[index] / 255;
+      const localMeanSquare = blurredSquared[index] / 255;
+      const localStd = Math.sqrt(Math.max(localMeanSquare - localMean * localMean, 0));
+      const topLeft = gray[Math.max(0, y - 1) * info.width + Math.max(0, x - 1)] / 255;
+      const topRight = gray[Math.max(0, y - 1) * info.width + Math.min(info.width - 1, x + 1)] / 255;
+      const bottomLeft = gray[Math.min(info.height - 1, y + 1) * info.width + Math.max(0, x - 1)] / 255;
+      const bottomRight = gray[Math.min(info.height - 1, y + 1) * info.width + Math.min(info.width - 1, x + 1)] / 255;
+      const curvature = Math.min(1, Math.abs(2 * (topLeft + topRight + bottomLeft + bottomRight) - 8 * center));
+      const classId = classifyFeature(center, gradient, localStd, curvature);
       prediction[index] = classId;
       counts[classId] += 1;
       const color = getClassColor(classId);
@@ -70,6 +87,6 @@ export async function runSegmentation(dataUrl: string, filename: string): Promis
     width: info.width,
     height: info.height,
     classCounts: TERRAIN_CLASSES.map(item => ({ classId: item.id, className: item.name, pixels: counts[item.id], share: Number((counts[item.id] / total).toFixed(4)) })),
-    disclaimer: "This is a transparent nearest-prototype baseline trained on a small MSL seed. It is not a flight-ready or validated neural segmentation model.",
+    disclaimer: "This is a transparent multi-prototype classical baseline trained on 82 matched MSL image-label pairs. It is not flight-ready and should be interpreted alongside the visible evidence layers.",
   };
 }
