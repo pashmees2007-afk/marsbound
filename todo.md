@@ -45,3 +45,21 @@
 - [x] Verify the actual mobile upload-to-server-prediction path on the full-stack build.
 - [x] Save the verified full-stack segmentation and comparison update as a project checkpoint.
 - [x] Save a final project checkpoint containing the verified backend, comparison interface, and responsive upload-flow validations.
+
+## Semantic Segmentation Network
+
+- [x] Confirm available training runtime and define an image-level train/validation/test split from matched MSL pairs.
+- [x] Prepare normalized image-mask tensors with ignored unlabeled pixels and class-weighted loss.
+- [x] Train a compact semantic segmentation network and save reproducible model artifacts.
+- [x] Evaluate the network against the held-out test split and compare it with the prototype baseline.
+- [x] Retain the selected evaluated baseline in server-side inference because the candidate did not improve held-out macro F1.
+- [x] Verify trained-model evaluation artifacts and preserve the existing validated upload, prediction, comparison, and responsive UI flows.
+
+## Rare-Hazard Segmentation Improvement
+
+ - [x] Measure current big-rock, sand, bedrock, and soil coverage across the matched MSL seed and preserve an image-level held-out test split.
+ - [x] Create high-resolution training patches that oversample labelled big-rock and sand regions while retaining regular terrain coverage.
+ - [x] Train a class-balanced segmentation network with focal loss and terrain-preserving augmentation.
+ - [x] Compare held-out macro F1 and per-class rare-hazard F1 against the original U-Net and server baseline.
+ - [x] Promote a model only if it improves the held-out rare-hazard criteria; otherwise retain the current disclosed baseline.
+ - [x] Document the experiment and update MARSBOUND only for a validated improvement.
