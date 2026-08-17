@@ -1,8 +1,8 @@
-# Landing-Zone Dashboard Tasks
+# MARSBOUND Redesign Tasks
 
-- [x] Define the displayed risk-scoring data and recommended landing-zone rationale from the supplied workflow.
-- [x] Add a terrain grid and color-coded risk heatmap to the verified Mars sample.
-- [x] Surface candidate rock/crater hazards and connect them visually to grid risk values.
-- [x] Add a recommended-zone decision card with alternatives and clear safety reasoning.
-- [x] Preserve the existing raw-versus-annotated comparison and OpenCV-method explanations.
-- [x] Verify the finished dashboard on desktop and mobile, then save a project checkpoint.
+- [x] Extract the MARSBOUND mission flow, visual direction, and required information hierarchy from the supplied specification.
+- [x] Create or select cinematic mission-control imagery and a brand mark for the redesigned dark interface.
+- [x] Implement the full mission journey: landing hero, image acquisition, processing sequence, analysis modes, risk map, ranking, and recommendation.
+- [x] Preserve the verified OpenCV-backed risk data while clearly distinguishing it from unprocessed staged uploads.
+- [x] Add explainability details and an analysis report export to support judge review.
+- [x] Verify desktop and mobile interactions, then save a finished project checkpoint.

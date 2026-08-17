@@ -1,71 +1,76 @@
-# Mars Image Analysis Tool — Design Directions
+# MARSBOUND — Design Directions
 
 ## Three Directions Considered
 
-### 1. Terrain Signal Desk
-**Very Brief Intro:** A field-science instrument panel inspired by rover operations, rendered with layered mineral-paper surfaces and rust-red scientific annotation. It makes image analysis feel like a deliberate act of reading a landscape rather than pressing a generic dashboard button.
+### 1. Mission Documentary Interface
+**Very Brief Intro:** A cinematic near-black mission console that uses large Mars imagery, restrained red status signals, white technical typography, and deliberate information pacing. It translates NASA-like editorial authority into an original landing-safety product rather than copying a government website.
 
-**Probability:** 0.031
+**Probability:** 0.018
 
-### 2. Orbital Index
-**Very Brief Intro:** A clean archive interface with pale spacecraft-paper backgrounds, orbital geometry, and editorial image plates. It would feel like a museum collection system for planetary evidence.
+### 2. Surface Survey Instrument
+**Very Brief Intro:** A close-range terrain workstation built around image plates, geological measurement overlays, and rugged field materials. It emphasizes local hazard inspection over the larger mission narrative.
 
-**Probability:** 0.076
+**Probability:** 0.064
 
-### 3. Basalt Night Lab
-**Very Brief Intro:** A high-contrast exploration console on near-black basalt with luminous green and red detection traces. It would emphasize the machine-vision layer and make the imagery feel more cinematic.
+### 3. Orbital Descent Archive
+**Very Brief Intro:** An archival aerospace system with dense coordinate grids, long-form telemetry, and satellite-image frames. It makes the scoring engine feel like a documentable planning artifact.
 
-**Probability:** 0.014
+**Probability:** 0.037
 
 ---
 
-## Chosen Direction: Terrain Signal Desk
+## Chosen Direction: Mission Documentary Interface
 
 ### Design Movement
-**Contemporary scientific field journal** meets a carefully calibrated instrument panel. The visual language favors observation, material texture, and restrained scientific notation over generic software-dashboard tropes.
+**Aerospace mission control meets cinematic space documentary.** This is an original MARSBOUND control room—not a NASA site clone—with a dark exhibition-like atmosphere that gives terrain imagery, status readouts, and the landing decision equal authority.
 
 ### Core Principles
-1. **The image is evidence.** Photography remains the visual anchor, presented as an oversized field plate rather than a background decoration.
-2. **Controls are legible instruments.** Sliders, thresholds, and layer toggles should look measured and deliberate, with immediate visual feedback.
-3. **Annotations explain uncertainty.** Numbers and labels contextualize detections without overstating precision.
-4. **Material restraint produces hierarchy.** Warm paper, charcoal ink, and mineral tones let the red edge overlay and green circle overlay become meaningful analytical signals.
+1. **The landing recommendation is the visual climax.** Visitors should immediately see where to land, its risk score, and why it earned the rank.
+2. **Workflow, not widgets.** The interface should progress visibly from image acquisition to hazard detection, risk generation, ranking, and report.
+3. **Cinematic evidence, restrained controls.** Large photography and sharp technical panels coexist without sliding into cyberpunk or generic SaaS patterns.
+4. **Explainability is part of safety.** Every recommendation exposes its supporting evidence, scoring signals, and uncertainty.
 
 ### Color Philosophy
-The base palette uses warm **regolith paper** to echo Martian dust and field notebooks. Charcoal provides the working contrast; a dark iron-red indicates Canny edges, while a signal green identifies Hough-circle candidates. Red and green are reserved primarily for detection layers, so they read as analytical marks rather than decoration.
+Near-black and charcoal create the feeling of a dark mission-control room, giving off-white typography strong contrast. Mars red acts as a selective mission/status accent. Green, amber, and red only appear for safety state, risk level, and active results; they never become decorative gradients.
 
 ### Layout Paradigm
-An **asymmetric bench layout** replaces a conventional centered dashboard. The main image plate dominates the left two-thirds of the workspace; a narrow analytical control rail runs along the right. The top band carries the project’s statement and mission counters, while a lower evidence strip provides metrics and the method legend.
+The site begins as a full-bleed mission briefing, then folds into a **descent workflow**: acquisition on the left, diagnostic sequence in the middle, analysis evidence and recommendation on the right. Content scales from wide cinematic panels to stacked mobile mission cards without becoming a generic dashboard grid.
 
 ### Signature Elements
-1. **Contour-line field marks:** thin, offset arcs and coordinate ticks quietly frame panels and headings.
-2. **Analysis marks:** red edge swatches and green circular rings recur only where they signify visual-processing concepts.
-3. **Specimen labels:** monospaced index lines, scale bars, and small field-note captions identify images and settings.
+1. **Mission strips:** compact uppercase metadata like `MB-LSIS // MISSION CONTROL`, image identifiers, coordinate ticks, and live-state lamps.
+2. **Sight-line overlays:** thin crosshairs, cropped grid lines, and scanner passes applied sparingly to image plates.
+3. **Descent signal:** a distinctive red horizon arc and landing-reticle mark repeated in the logo, primary CTA, and selected safe zone.
 
 ### Interaction Philosophy
-Interactions should feel like manipulating a scientific instrument: controls respond directly and quickly, without theatrical effects. Uploading an image becomes a transition from empty specimen tray to live field plate. Toggling detection layers preserves the original imagery as the baseline evidence.
+Buttons advance an understandable mission state: load terrain, run analysis, review modes, inspect zones, export the report, or reset. The demo uses verified saved detector results; an uploaded image is clearly identified as staged until a future OpenCV API completes it.
 
 ### Animation
-Use subtle 160–240 ms transform-and-opacity transitions with a `cubic-bezier(0.23, 1, 0.32, 1)` exit curve. The image plate should fade and translate upward by 6 px on selection; layer toggles should crossfade their overlays; dashboard labels can stagger once on initial load. Avoid infinite motion, glows, and animated charts. Respect `prefers-reduced-motion` by removing non-essential transitions.
+The hero terrain plate drifts minimally on load. Acquisition and processing use 180–300 ms opacity and translate transitions, with a narrow scanner line during analysis. Hazard and grid layers reveal in a short sequence before the recommended zone receives one restrained pulse. All non-essential animation is disabled under `prefers-reduced-motion`.
 
 ### Typography System
-**DM Mono** is used for metrics, controls, labels, and file metadata, reinforcing the instrument-panel feel. **Fraunces** is used for the editorial display headline and section titles, bringing the human dimension of field science. Body copy uses a clear system sans stack for readable explanatory text. Headings are large but left-aligned; labels use uppercase tracking rather than oversized weight.
+**Space Grotesk** provides clear technical and interface hierarchy; **IBM Plex Mono** provides telemetry, labels, score tables, and instrument details. Editorial scale comes from wide weight contrast and unusually generous headline spacing, not from decorative fonts.
 
 ### Brand Essence
-**A visual field desk for turning raw Mars imagery into inspectable computer-vision evidence, built for curious experimenters who want to see what the algorithms see.**
+**MARSBOUND is an autonomous landing-site intelligence system that turns Mars terrain imagery into an explainable, mission-ready safety decision.**
 
-**Personality:** observant, grounded, exacting.
+**Personality:** authoritative, lucid, disciplined.
 
 ### Brand Voice
-The voice is concise, observational, and transparent about uncertainty. Headlines should frame analysis as evidence gathering; microcopy should name a real visual action rather than making generic promises.
+Copy is clear, tense, and operational. It should describe a specific system state or mission decision—not use startup slogans.
 
 Example lines:
 
-> Read the terrain, layer by layer.
+> Find the safest ground before touchdown.
 
-> Candidate circles are signals to inspect, not confirmed craters.
+> Recommendation ready. Review the terrain evidence before committing descent.
 
 ### Wordmark & Logo
-The mark is a **cropped crater ring intersected by three fine contour lines**, suggesting both a circular feature and a scanned landscape. The wordmark uses a custom, tightly tracked serif-and-mono pairing: `TERRAIN / SIGNAL` with the slash aligned to a small coordinate tick.
+The MARSBOUND mark is a **minimal descent arc crossing a centered landing reticle**, rendered in mission red and off-white. The wordmark uses a tight uppercase technical sans with a small `//` separator and the subtitle set in mono.
 
 ### Signature Brand Color
-**Oxide Vermilion** — `#C84A2C` — serves as the ownable edge-detection and field-annotation color.
+**Descent Red** — `#E13C2E` — is the exclusive mission-critical accent.
+
+## Style Decisions
+
+- Preserve visual credibility by labeling the current Curiosity result as a verified sample and raw user uploads as staged until a real backend analysis is connected.
+- Use MARSBOUND’s own wordmark, mark, and telemetry language; draw inspiration from aerospace editorial design without reproducing NASA branding or layouts.
