@@ -87,3 +87,12 @@
 - [x] Train and evaluate a larger-corpus candidate against the current v2 model on a common held-out test set.
 - [x] Promote the candidate in MARSBOUND only if it improves held-out macro F1 and does not regress rare-hazard F1 materially.
 - [x] Re-run unit tests and desktop/mobile upload validation after any model promotion, then document the result.
+
+## 2,500-Pair AI4Mars MSL Training Expansion
+
+- [x] Extend the resumable official MSL retrieval from 718 to 2,500 directly matched rover-image and label pairs without placing training assets in the web project.
+- [x] Preserve archive provenance and run an integrity count for the full 2,500-pair corpus.
+- [x] Create a fresh class-aware image-level train, validation, and held-out test split with sand and big-rock evidence in evaluation sets.
+- [x] Train and evaluate a 2,500-pair terrain candidate against the active v3 model on the same held-out test set.
+- [x] Promote the new candidate only if macro F1 improves and the sand/big-rock results remain at least as strong; retain v3 because v4 did not satisfy the rare-hazard threshold.
+- [x] Validate the final server model with tests and actual desktop/mobile terrain-upload flows, then document the outcome.
