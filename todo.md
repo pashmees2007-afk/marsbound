@@ -78,3 +78,12 @@
 - [x] Inventory the 118 matched MSL pairs recovered from the interrupted official selective download and retain their per-image provenance.
 - [x] Build stratified image-level splits from the recovered corpus with rare terrain classes represented in both validation and test sets where available.
 - [x] Train and evaluate an expanded-data candidate, then retain or promote it strictly by held-out macro F1 and per-class F1.
+
+## Larger AI4Mars Corpus Expansion
+
+- [x] Build a robust resumable retrieval workflow that expands beyond the recovered 118 matched MSL pairs without downloading unpaired data into the web project.
+- [x] Save source-archive provenance for every newly retrieved rover image and semantic label pair.
+- [x] Audit terrain-class coverage and create a new stratified image-level train, validation, and held-out test split with rare hazards represented where available.
+- [x] Train and evaluate a larger-corpus candidate against the current v2 model on a common held-out test set.
+- [x] Promote the candidate in MARSBOUND only if it improves held-out macro F1 and does not regress rare-hazard F1 materially.
+- [x] Re-run unit tests and desktop/mobile upload validation after any model promotion, then document the result.

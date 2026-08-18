@@ -13,8 +13,9 @@ describe("segmentation prototype baseline", () => {
     });
   });
 
-  it("records the expanded matched-pair provenance", () => {
-    expect(SEGMENTATION_MODEL.trainingPairs).toBe(82);
+  it("records the large-corpus matched-pair provenance", () => {
+    expect(SEGMENTATION_MODEL.trainingPairs).toBe(538);
+    expect(SEGMENTATION_MODEL.prototypesPerClass).toBe(24);
     expect(SEGMENTATION_MODEL.featureNames).toEqual(["intensity", "gradient", "local_std", "curvature"]);
   });
 });
