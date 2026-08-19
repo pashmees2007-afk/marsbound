@@ -6,18 +6,18 @@
 
 ## 1. Where MARSBOUND stands today
 
-The live model is `ai4mars-msl-multiprototype-v3`, a transparent classical classifier that compares pixel-level intensity, gradient, texture, and curvature patterns with learned terrain prototypes. On the current 300-image held-out split, it achieves 35.92% pixel accuracy and 33.16% macro F1. It is strongest on soil and comparatively weak on bedrock, sand, and big rock.
+**Outcome update — 19 August 2026.** The planned MobileNetV3-U-Net experiment completed and passed the strict promotion gate. The live model is now `ai4mars-msl-mobilenetv3-unet-v1`, which achieved 82.02% pixel accuracy and 81.75% macro F1 on the fixed 300-image held-out split. The table below preserves the previous v3 numbers as the historical benchmark that the promotion had to exceed.
 
-| Metric | Active v3 | Next target | Why it matters |
+| Metric | Historical v3 | Promoted MobileNetV3-U-Net | Why it matters |
 |---|---:|---:|---|
-| Pixel accuracy | 35.92% | ~60% | Overall exact terrain-pixel matches |
-| Macro F1 | 33.16% | 50%+ | Treats all four terrain classes fairly |
-| Soil F1 | 45.34% | Maintain or improve | Common terrain class |
-| Bedrock F1 | 23.89% | 45%+ | Current main confusion source |
-| Sand F1 | 28.90% | 45–50%+ | Landing-surface relevance |
-| Big-rock F1 | 34.51% | 45–50%+ | Safety-critical obstacle evidence |
+| Pixel accuracy | 35.92% | **82.02%** | Overall exact terrain-pixel matches |
+| Macro F1 | 33.16% | **81.75%** | Treats all four terrain classes fairly |
+| Soil F1 | 45.34% | **83.11%** | Common terrain class |
+| Bedrock F1 | 23.89% | **83.26%** | Main historical confusion source |
+| Sand F1 | 28.90% | **78.49%** | Landing-surface relevance |
+| Big-rock F1 | 34.51% | **82.15%** | Safety-critical obstacle evidence |
 
-The baseline is useful for the hackathon because it is transparent, but its handcrafted features cannot reliably separate terrain categories that have similar brightness, shadows, and texture. This is consistent with Mars-segmentation research: Martian terrain has small inter-class visual differences, strong scale changes, and pronounced class imbalance; the big-rock class can be particularly scarce. [2]
+The retired baseline remains useful as an archived explainability reference, but its handcrafted features could not reliably separate terrain categories with similar brightness, shadows, and texture. The promoted neural model materially improves the fixed-split scores; its separate evaluation and deployment limitations are recorded in `semantic_model_evaluation.md`. Mars terrain still has small inter-class visual differences, strong scale changes, and pronounced class imbalance; the big-rock class can be particularly scarce. [2]
 
 ## 2. Do not add random images first
 

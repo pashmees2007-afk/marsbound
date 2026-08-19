@@ -109,3 +109,18 @@
 - [x] Define rare-hazard-aware sampling, split, label-quality review, and augmentation rules for the 2,500-pair corpus.
 - [x] Specify a pretrained segmentation training and strict held-out evaluation path that can improve accuracy without hiding sand or big-rock failures.
 - [x] Deliver prioritized milestones and promotion criteria for progressing from the current baseline toward a trustworthy 60% pixel-accuracy target.
+
+## MobileNetV3-U-Net Candidate
+
+- [x] Prepare a reproducible pretrained MobileNetV3-U-Net configuration with rare-hazard-aware crops, augmentation, ignored unlabelled pixels, and a balanced segmentation loss.
+- [x] Train the candidate using only the fixed 1,900-image training partition and select checkpoints using only the 300-image validation partition.
+- [x] Compare the selected candidate with active v3 on the untouched 300-image test set using pixel accuracy, macro F1, sand F1, and big-rock F1.
+- [x] Promote the candidate into MARSBOUND only if it improves the shared held-out evaluation without reducing rare-hazard F1; otherwise retain v3.
+- [x] Run tests and desktop/mobile upload validation after any promotion, then document the model-selection result.
+
+## MobileNetV3-U-Net Promotion
+
+- [x] Export the selected epoch-11 MobileNetV3-U-Net checkpoint to a production-compatible ONNX artifact with its 256×256 RGB normalization contract.
+- [x] Replace the v3 handcrafted classifier in the server analysis path with ONNX-backed MobileNetV3-U-Net inference and truthful held-out-test provenance.
+- [x] Validate the promoted model with unit tests, production build checks, and desktop/mobile upload-to-prediction flows.
+- [x] Document the fixed-split promotion decision, model limitations, and deployment rationale before checkpointing the hackathon demo.
