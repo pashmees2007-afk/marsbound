@@ -96,3 +96,16 @@
 - [x] Train and evaluate a 2,500-pair terrain candidate against the active v3 model on the same held-out test set.
 - [x] Promote the new candidate only if macro F1 improves and the sand/big-rock results remain at least as strong; retain v3 because v4 did not satisfy the rare-hazard threshold.
 - [x] Validate the final server model with tests and actual desktop/mobile terrain-upload flows, then document the outcome.
+
+## Hackathon Architecture Diagram
+
+- [x] Map the current MARSBOUND client, server, computer-vision, terrain-classification, storage, database, and decision-support components.
+- [x] Render a deterministic end-to-end architecture diagram with data-flow labels and an evidence-first decision boundary.
+- [x] Deliver the diagram with a concise hackathon explanation of how imagery becomes an inspectable landing recommendation.
+
+## 60% Accuracy Dataset Optimization Plan
+
+- [x] Diagnose the active v3 model’s class-level limitations and dataset characteristics relative to the 60% pixel-accuracy target.
+- [x] Define rare-hazard-aware sampling, split, label-quality review, and augmentation rules for the 2,500-pair corpus.
+- [x] Specify a pretrained segmentation training and strict held-out evaluation path that can improve accuracy without hiding sand or big-rock failures.
+- [x] Deliver prioritized milestones and promotion criteria for progressing from the current baseline toward a trustworthy 60% pixel-accuracy target.
