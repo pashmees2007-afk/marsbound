@@ -129,3 +129,12 @@
 
 - [x] Create a new private GitHub repository for the verified MARSBOUND project.
 - [x] Push the current project source and confirm the new remote repository state.
+
+## GitHub Repository Visibility
+
+- [x] Change the MARSBOUND GitHub repository visibility from private to public and verify the public URL.
+
+## Hackathon README
+
+- [x] Write a public, hackathon-ready README covering the problem, system, training protocol, honest results, setup, and demo flow.
+- [x] Validate the README content and push it to the public MARSBOUND GitHub repository.
