@@ -124,3 +124,8 @@
 - [x] Replace the v3 handcrafted classifier in the server analysis path with ONNX-backed MobileNetV3-U-Net inference and truthful held-out-test provenance.
 - [x] Validate the promoted model with unit tests, production build checks, and desktop/mobile upload-to-prediction flows.
 - [x] Document the fixed-split promotion decision, model limitations, and deployment rationale before checkpointing the hackathon demo.
+
+## GitHub Source Publication
+
+- [x] Create a new private GitHub repository for the verified MARSBOUND project.
+- [ ] Push the current project source and confirm the new remote repository state.
